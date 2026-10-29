@@ -19,6 +19,8 @@ export interface CallArgs {
   max_pages?: number;
   fields?: string[];
   idempotency_key?: string;
+  /** In-process only (never a tool argument): receives the parsed answer before redaction, so a task tool can hold a one-time secret safely. */
+  onResponse?: (json: unknown) => void;
 }
 
 /** Models often send "55" for an integer or "true" for a boolean; accept the unambiguous cases. */
@@ -202,6 +204,7 @@ export class Executor {
       merged = res.json;
     }
 
+    args.onResponse?.(merged);
     return this.format(op, res, merged, pagination, idempotencyKey, args);
   }
 

@@ -27,6 +27,7 @@ export class Redactor {
         out = out.split(secret).join(MARK);
       }
     }
+    out = out.replace(/whsec_[A-Za-z0-9]{20,}/g, MARK);
     out = out.replace(/hbk_[A-Za-z0-9_]{6,}/g, MARK);
     out = out.replace(/(Bearer\s+)[A-Za-z0-9._~+/=-]{16,}/gi, `$1${MARK}`);
     return out;
