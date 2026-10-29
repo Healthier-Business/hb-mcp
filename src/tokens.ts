@@ -110,10 +110,7 @@ export class TokenManager {
       accessExpiresAt: t + (b.expires_in ?? 3600) * 1000,
       refreshExpiresAt: t + (b.refresh_expires_in ?? 604_800) * 1000,
     };
-    if (this.pair) {
-      redactor.forget(this.pair.access);
-      redactor.forget(this.pair.refresh);
-    }
+    // Superseded tokens stay registered: if the Hub ever echoes one back it is still scrubbed.
     redactor.add(next.access);
     redactor.add(next.refresh);
     this.pair = next;

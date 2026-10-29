@@ -3,6 +3,7 @@ import { capOutput, selectFields } from '../src/output.js';
 import { Redactor } from '../src/redact.js';
 import { slimSchema, validate } from '../src/schema.js';
 import { buildQuery } from '../src/http.js';
+import type { Json } from '../src/generator/build.js';
 
 describe('schema validator', () => {
   const schema = {
@@ -15,7 +16,7 @@ describe('schema validator', () => {
       status: { enum: ['a', 'b'] },
       n: { type: 'integer', minimum: 1, maximum: 5 },
     },
-  } as const;
+  } as unknown as Json;
 
   it('accepts a valid body', () => {
     expect(validate({ email: 'a@b.co', first_name: 'A', roles: null, n: 3 }, schema)).toEqual([]);

@@ -21,6 +21,17 @@ export interface CallArgs {
   idempotency_key?: string;
 }
 
+/** Models often send "55" for an integer or "true" for a boolean; accept the unambiguous cases. */
+function coerce(value: unknown, schema: Record<string, unknown>): unknown {
+  if (typeof value !== 'string') return value;
+  const types = Array.isArray(schema.type) ? schema.type : [schema.type];
+  if (!types.includes('string')) {
+    if ((types.includes('integer') || types.includes('number')) && /^-?\d+(\.\d+)?$/.test(value)) return Number(value);
+    if (types.includes('boolean') && (value === 'true' || value === 'false')) return value === 'true';
+  }
+  return value;
+}
+
 const DEFAULT_MAX_PAGES = 5;
 const HARD_MAX_PAGES = 20;
 const HEALTH_NOTE = 'Contains health data (special category). Use only what the task needs; do not copy it into other systems, tickets or logs.';
@@ -64,7 +75,7 @@ export class Executor {
     const pathParams = args.path_params ?? {};
     let path = op.path;
     for (const p of op.parameters.filter((x) => x.in === 'path')) {
-      const v = pathParams[p.name];
+      const v = coerce(pathParams[p.name], p.schema);
       if (v === undefined || v === null || v === '') {
         issues.push(`path_params.${p.name} is required`);
         continue;
@@ -78,10 +89,12 @@ export class Executor {
       }
     }
 
-    const query = args.query ?? {};
+    const query: Record<string, unknown> = { ...(args.query ?? {}) };
     const queryDefs = op.parameters.filter((x) => x.in === 'query');
-    for (const [k, v] of Object.entries(query)) {
+    for (const [k, raw] of Object.entries(query)) {
       const def = queryDefs.find((q) => q.name === k);
+      const v = def ? coerce(raw, def.schema) : raw;
+      if (def) query[k] = v;
       if (!def) {
         issues.push(`query.${k} is not a query parameter of ${op.id} (valid: ${queryDefs.map((q) => q.name).join(', ') || 'none'})`);
         continue;
