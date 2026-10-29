@@ -12,10 +12,10 @@ afterEach(async () => {
 });
 
 describe('compact mode tool list', () => {
-  it('exposes exactly the seven meta tools with annotations and mode-aware descriptions', async () => {
+  it('exposes exactly the eight meta tools with annotations and mode-aware descriptions', async () => {
     const { tools } = await h.client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual(
-      ['hb_call_operation', 'hb_describe_event', 'hb_describe_operation', 'hb_list_events', 'hb_search_operations', 'hb_status', 'hb_verify_webhook_signature'],
+      ['hb_call_operation', 'hb_describe_event', 'hb_describe_operation', 'hb_list_events', 'hb_search_guides', 'hb_search_operations', 'hb_status', 'hb_verify_webhook_signature'],
     );
     const call = tools.find((t) => t.name === 'hb_call_operation')!;
     expect(call.description).toContain('[SANDBOX]');

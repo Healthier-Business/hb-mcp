@@ -85,6 +85,24 @@ export function buildPrompts(ctx: AppContext): PromptDefinition[] {
         ].join('\n'),
     },
     {
+      name: 'get-started-in-sandbox',
+      title: 'Get started in a sandbox',
+      description: 'Walk a new developer from sign-up to a first read call: work email, verify, sandbox, API key, HB_BASE_URL/HB_API_KEY, --doctor, first read.',
+      arguments: [],
+      build: () =>
+        [
+          `Walk the new developer through getting started, one step at a time, waiting for them to finish each step. Current environment: ${env} (${ctx.config.baseUrl}); ${ctx.tokens.hasKey ? 'a key is configured' : 'no HB_API_KEY is configured yet'}. Never ask them to paste a key, token or secret in chat.`,
+          '1. Sign up on the developer portal with a WORK email address (Gmail, Yahoo, Apple Mail and disposable addresses are refused), then confirm it with the link in the email (valid 3 days; check spam). Guides: hb://guides/portal-create-your-account, hb://guides/portal-verify-your-email. Overview: hb://guides/portal-overview.',
+          '2. In the console choose Sandboxes, then New sandbox, and name it (2 to 120 characters). Copy its base address. Guide: hb://guides/portal-sandboxes.',
+          '3. In the console choose API keys, pick the sandbox, choose New key. Prefer Read only or Custom access for a first run. The key is shown once ("Copy it now"): they store it in their own secret store. Guide: hb://guides/portal-api-keys-and-tokens.',
+          '4. They set HB_BASE_URL (the sandbox base address) and HB_API_KEY in the MCP server config (or shell), keep HB_READ_ONLY=true, and restart the client. See the README quickstart for their client.',
+          '5. They run `npx -y @healthier-business/hub-mcp --doctor` in the same environment: it should say SANDBOX, token exchange succeeded and list the scopes.',
+          `6. Run hb_status to confirm environment and scopes, then a first read: ${call('hub.candidates.list')} (needs hub:candidates:read), and explain the answer (candidate_ref, pagination).`,
+          '7. Suggest next steps: hb://guides/portal-webhooks and hb://guides/portal-simulate to test events, hb://guides/portal-api-playground and hb://guides/portal-request-log-and-debugging to explore and debug, hb://guides/portal-go-to-production when ready. Use hb_search_guides to find other guides.',
+          'If a step fails, find the guide with hb_search_guides (for example the FAQ: hb://guides/portal-faq-and-troubleshooting) and read the error message to the user.',
+        ].join('\n'),
+    },
+    {
       name: 'go-live-checklist',
       title: 'Go-live checklist',
       description: 'Walk through moving an integration from a sandbox to the live Hub.',

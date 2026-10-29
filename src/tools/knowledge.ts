@@ -4,6 +4,7 @@ import { redactor } from '../redact.js';
 import { SERVER_VERSION, type AppContext, scopeAllowed } from '../context.js';
 import { describeError } from '../errors.js';
 import { writesEnabled } from '../config.js';
+import { searchGuides } from '../guides.js';
 import { jsonResult, textResult, type ToolDefinition } from './types.js';
 
 const READ_ONLY = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } as const;
@@ -68,6 +69,11 @@ export function statusTool(ctx: AppContext): ToolDefinition {
       if (!ctx.tokens.hasKey) {
         status.auth = { configured: false, problem: 'HB_API_KEY is not set in the server environment.' };
         warnings.push('No API key configured: Hub calls will fail. Set HB_API_KEY in the MCP server config (never paste a key in chat) and restart.');
+        if (c.modeSource === 'default') {
+          warnings.push('The base URL is the default LIVE Hub (HB_BASE_URL is not set to a sandbox). To build or learn, use a sandbox base address (see hb://guides/portal-sandboxes).');
+        }
+        status.getting_started =
+          'No key yet? Read hb://guides/portal-create-your-account (sign up with a work email and verify it), hb://guides/portal-sandboxes (create a sandbox) and hb://guides/portal-api-keys-and-tokens (create a test key), or run the get-started-in-sandbox prompt. Then set HB_API_KEY and HB_BASE_URL in the MCP server config and restart.';
       } else {
         try {
           const res = await ctx.client.send({ method: 'GET', path: '/api/v2/auth/me', pathTemplate: '/api/v2/auth/me', retryable: true });
@@ -91,6 +97,11 @@ export function statusTool(ctx: AppContext): ToolDefinition {
   };
 }
 
+const searchGuidesArgs = z.object({
+  query: z.string().min(1),
+  group: z.enum(['all', 'api', 'portal']).optional(),
+  limit: z.number().int().min(1).max(20).optional(),
+});
 const listEventsArgs = z.object({ portal: z.string().optional(), query: z.string().optional() });
 const describeEventArgs = z.object({ event_type: z.string() });
 const verifyArgs = z.object({
@@ -101,6 +112,31 @@ const verifyArgs = z.object({
   tolerance_seconds: z.number().int().min(1).max(86_400).optional(),
   now_epoch_seconds: z.number().int().optional(),
 });
+
+export function searchGuidesTool(): ToolDefinition {
+  return {
+    name: 'hb_search_guides',
+    description:
+      'Search the bundled guides by words and get the best matches with a snippet and the resource to read (hb://guides/<name>). Covers the Hub API v2 developer guides and the developer portal guides (sign up, sandboxes, keys, webhooks, Playground, going to production). Knowledge only: sends nothing, needs no key.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Words to look for, e.g. "create sandbox", "rotate webhook secret", "idempotency key".' },
+        group: { type: 'string', enum: ['all', 'api', 'portal'], description: '"api" = Hub API guides, "portal" = developer portal (console) guides. Default all.' },
+        limit: { type: 'integer', description: 'Max results (default 5, max 20).' },
+      },
+      required: ['query'],
+      additionalProperties: false,
+    },
+    annotations: { title: 'Search guides', ...READ_ONLY },
+    handler: async (raw) => {
+      const a = searchGuidesArgs.safeParse(raw);
+      if (!a.success) return textResult(`Invalid arguments: ${a.error.message}`, true);
+      const hits = searchGuides(a.data.query, { group: a.data.group, limit: a.data.limit });
+      return jsonResult({ count: hits.length, guides: hits.map((h) => ({ uri: h.uri, title: h.title, description: h.description, snippet: h.snippet })), next: 'Read a guide in full with its hb://guides/<name> resource.' }, (s) => s);
+    },
+  };
+}
 
 export function listEventsTool(ctx: AppContext): ToolDefinition {
   return {

@@ -3,7 +3,7 @@ import type { JsonObject } from '../generator/build.js';
 import type { AppContext } from '../context.js';
 import { isOperationAvailable, isWrite, modeBadge, writeNote } from '../safety.js';
 import { slimSchema } from '../schema.js';
-import { describeEventTool, listEventsTool, statusTool, verifySignatureTool } from './knowledge.js';
+import { describeEventTool, listEventsTool, searchGuidesTool, statusTool, verifySignatureTool } from './knowledge.js';
 import type { ToolAnnotations, ToolDefinition } from './types.js';
 
 const RESERVED = new Set(['body', 'confirm', 'fields', 'all_pages', 'max_pages', 'idempotency_key']);
@@ -78,7 +78,7 @@ export function toolDescription(ctx: AppContext, op: CatalogueOperation): string
 }
 
 export function buildFullTools(ctx: AppContext): ToolDefinition[] {
-  const tools: ToolDefinition[] = [statusTool(ctx), listEventsTool(ctx), describeEventTool(ctx), verifySignatureTool(ctx)];
+  const tools: ToolDefinition[] = [statusTool(ctx), listEventsTool(ctx), describeEventTool(ctx), verifySignatureTool(ctx), searchGuidesTool()];
   for (const op of ctx.catalogue.operations) {
     if (!isOperationAvailable(ctx.config, op)) continue;
     const { schema, argMap } = buildInputSchema(op);

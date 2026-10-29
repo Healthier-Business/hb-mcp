@@ -3,6 +3,7 @@ import { assetPath } from './paths.js';
 import type { AppContext } from './context.js';
 import { describeOperation } from './tools/compact.js';
 import { redactor } from './redact.js';
+import { loadGuides } from './guides.js';
 
 export interface ResourceEntry {
   uri: string;
@@ -20,22 +21,13 @@ export interface ResourceTemplate {
   mimeType: string;
 }
 
-function guideSlug(file: string): string {
-  return file.replace(/^\d+-/, '').replace(/\.md$/, '');
-}
-
-function titleOf(markdown: string, fallback: string): string {
-  const m = /^#\s+(.+)$/m.exec(markdown);
-  return m?.[1]?.trim() ?? fallback;
-}
-
 export class ResourceRegistry {
-  private guides = new Map<string, string>();
+  private guides = new Map<string, { title: string; description: string; text: string }>();
   private portals = new Map<string, string>();
 
   constructor(private readonly ctx: AppContext) {
-    for (const f of readdirSync(assetPath('content/guides')).filter((n) => /^\d\d-.*\.md$/.test(n)).sort()) {
-      this.guides.set(guideSlug(f), readFileSync(assetPath('content/guides', f), 'utf8'));
+    for (const g of loadGuides()) {
+      this.guides.set(g.slug, g);
     }
     if (existsSync(assetPath('content/portals'))) {
       for (const f of readdirSync(assetPath('content/portals')).filter((n) => n.endsWith('.md'))) {
@@ -48,8 +40,8 @@ export class ResourceRegistry {
     const out: ResourceEntry[] = [
       { uri: 'hb://spec/overview', name: 'overview', title: 'Hub API v2 overview', description: 'Counts, toolsets and an index of every operation.', mimeType: 'text/markdown' },
     ];
-    for (const [slug, text] of this.guides) {
-      out.push({ uri: `hb://guides/${slug}`, name: `guide-${slug}`, title: `Guide: ${titleOf(text, slug)}`, description: `Hub API v2 developer guide (${slug}).`, mimeType: 'text/markdown' });
+    for (const [slug, g] of this.guides) {
+      out.push({ uri: `hb://guides/${slug}`, name: `guide-${slug}`, title: g.title, description: g.description, mimeType: 'text/markdown' });
     }
     for (const toolset of this.toolsets()) {
       out.push({ uri: `hb://portals/${toolset}`, name: `portal-${toolset}`, title: `Portal: ${toolset}`, description: `What the ${toolset} portal API does and its operations.`, mimeType: 'text/markdown' });
@@ -77,8 +69,8 @@ export class ResourceRegistry {
   read(uri: string): { mimeType: string; text: string } | undefined {
     const guide = /^hb:\/\/guides\/([\w-]+)$/.exec(uri);
     if (guide) {
-      const t = this.guides.get(guide[1] as string);
-      return t === undefined ? undefined : { mimeType: 'text/markdown', text: t };
+      const g = this.guides.get(guide[1] as string);
+      return g === undefined ? undefined : { mimeType: 'text/markdown', text: g.text };
     }
     const portal = /^hb:\/\/portals\/([\w-]+)$/.exec(uri);
     if (portal) {

@@ -13,7 +13,16 @@ export function buildInstructions(config: Config, opCount: number, eventCount: n
     config.toolMode === 'compact'
       ? `Workflow: hb_status first; then hb_search_operations to find an operation, hb_describe_operation to read its exact shape, hb_call_operation to run it. hb_list_events / hb_describe_event explain the ${eventCount} webhook events; hb_verify_webhook_signature checks a delivery locally.`
       : `Each Hub operation is its own tool (name = operation id with underscores, e.g. hub_candidates_list). hb_status shows who you are; hb_list_events / hb_describe_event explain the ${eventCount} webhook events.`;
+  const noBaseUrl =
+    !config.apiKey && config.modeSource === 'default'
+      ? 'No sandbox base URL (HB_BASE_URL) is set, so this server points at the default LIVE Hub. Someone building or learning should use a sandbox: hb://guides/portal-sandboxes shows how to create one and where its base address is.'
+      : undefined;
+  const setup = config.apiKey
+    ? undefined
+    : 'NOT CONFIGURED: no HB_API_KEY is set, so Hub calls will fail. Do not ask for a key in chat. Tell the user to get one from the developer portal and walk them through it with hb://guides/portal-create-your-account (sign up with a work email and verify it) and hb://guides/portal-sandboxes (create a sandbox), then hb://guides/portal-api-keys-and-tokens (create a test key); the get-started-in-sandbox prompt does this step by step. They put the key in HB_API_KEY and the sandbox address in HB_BASE_URL in the MCP server config, then restart.';
   return [
+    ...(setup ? [setup] : []),
+    ...(noBaseUrl ? [noBaseUrl] : []),
     `Healthier Business Hub API v2 (${opCount} operations). Environment: ${env}. ${writes}`,
     how,
     'People are addressed only by candidate_ref (a uuid); never by internal id, and never invent one: list or search candidates first. A candidate reference of the client\'s own (candidate_reference) is different from candidate_ref.',
@@ -23,6 +32,7 @@ export function buildInstructions(config: Config, opCount: number, eventCount: n
     'Responses marked health_data contain special-category health information: use only what the task needs and do not repeat it elsewhere.',
     'Secrets: the API key lives only in the server environment (HB_API_KEY). Never ask the user to paste a key, token or webhook secret in chat, and never print one.',
     'Sandbox first: build and test in a sandbox, go live only after the user asks (see the go-live-checklist prompt). Quote request_id when reporting an error.',
-    'Docs are available as resources: hb://guides/<name> (authentication, errors, scopes-and-permissions, ...), hb://portals/<toolset>, hb://spec/operations/<id>, hb://spec/events/<type>.',
+    'Docs are available as resources: hb://guides/<name> (authentication, errors, scopes-and-permissions, ...), hb://portals/<toolset>, hb://spec/operations/<id>, hb://spec/events/<type>. hb_search_guides finds the right guide by words.',
+    'The developer portal (where a developer signs up, makes sandboxes, test keys and webhooks, uses the API Playground and request log, books support and goes to production) has its own guides: hb://guides/portal-overview, portal-create-your-account, portal-sandboxes, portal-api-keys-and-tokens, portal-webhooks, portal-simulate, portal-api-playground, portal-request-log-and-debugging, portal-support-and-booking-a-call, portal-go-to-production, and more. Use them when the user asks how to do something in the portal, not only about the API.',
   ].join('\n\n');
 }

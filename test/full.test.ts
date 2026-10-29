@@ -14,7 +14,7 @@ describe('full mode', () => {
     const { tools } = await h.client.listTools();
     const names = tools.map((t) => t.name);
     const gets = h.ctx.catalogue.operations.filter((o) => o.method === 'GET' && !o.internal);
-    expect(names).toHaveLength(gets.length + 4);
+    expect(names).toHaveLength(gets.length + 5);
     expect(names).toContain('hub_candidates_list');
     expect(names).not.toContain('hub_candidates_create');
     expect(names).not.toContain('auth_token_create');

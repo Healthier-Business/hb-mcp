@@ -4,7 +4,7 @@ import { writesEnabled } from '../config.js';
 import { scopeAllowed, type AppContext } from '../context.js';
 import { redactor } from '../redact.js';
 import { isOperationAvailable, isWrite, modeBadge } from '../safety.js';
-import { describeEventTool, listEventsTool, statusTool, verifySignatureTool } from './knowledge.js';
+import { describeEventTool, listEventsTool, searchGuidesTool, statusTool, verifySignatureTool } from './knowledge.js';
 import { jsonResult, textResult, type ToolDefinition } from './types.js';
 
 const searchArgs = z.object({
@@ -171,5 +171,5 @@ export function buildCompactTools(ctx: AppContext): ToolDefinition[] {
     },
   };
 
-  return [statusTool(ctx), search, describe, call, listEventsTool(ctx), describeEventTool(ctx), verifySignatureTool(ctx)];
+  return [statusTool(ctx), search, describe, call, listEventsTool(ctx), describeEventTool(ctx), verifySignatureTool(ctx), searchGuidesTool()];
 }

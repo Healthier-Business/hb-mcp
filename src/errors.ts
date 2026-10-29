@@ -37,7 +37,7 @@ export class AuthThrottledError extends Error {
 
 export class MissingApiKeyError extends Error {
   constructor() {
-    super('HB_API_KEY is not set. Put the API key in the MCP server environment (never in chat) and restart the server.');
+    super('HB_API_KEY is not set. Put the API key in the MCP server environment (never in chat) and restart the server. No key yet? Point the user to the developer portal guides: read hb://guides/portal-create-your-account (sign up and verify a work email), hb://guides/portal-sandboxes (create a sandbox) and hb://guides/portal-api-keys-and-tokens (create a test key), or use the get-started-in-sandbox prompt.');
   }
 }
 

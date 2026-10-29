@@ -19,7 +19,7 @@ describe('resources', () => {
     const { resources } = await h.client.listResources();
     const uris = resources.map((r) => r.uri);
     expect(uris).toEqual(expect.arrayContaining(['hb://guides/authentication', 'hb://guides/going-live', 'hb://portals/occupational-health', 'hb://portals/hub', 'hb://spec/overview']));
-    expect(uris.filter((u) => u.startsWith('hb://guides/'))).toHaveLength(15);
+    expect(uris.filter((u) => u.startsWith('hb://guides/'))).toHaveLength(36);
     const auth = await h.client.readResource({ uri: 'hb://guides/authentication' });
     expect((auth.contents[0] as any).text).toContain('refresh token');
     const portal = await h.client.readResource({ uri: 'hb://portals/occupational-health' });
@@ -40,7 +40,7 @@ describe('prompts', () => {
   it('lists the workflows and fills them in, mode-aware', async () => {
     h = await startHarness();
     const { prompts } = await h.client.listPrompts();
-    expect(prompts.map((p) => p.name)).toEqual(['book-practical-training', 'check-candidate-compliance', 'webhook-sandbox-setup', 'go-live-checklist', 'onboard-candidate']);
+    expect(prompts.map((p) => p.name)).toEqual(['book-practical-training', 'check-candidate-compliance', 'webhook-sandbox-setup', 'get-started-in-sandbox', 'go-live-checklist', 'onboard-candidate']);
     const book = await h.client.getPrompt({ name: 'book-practical-training', arguments: { candidate: 'Jane Doe' } });
     const text = (book.messages[0]!.content as any).text as string;
     expect(text).toContain('Jane Doe');
@@ -71,7 +71,7 @@ describe('Streamable HTTP transport', () => {
     const client = new Client({ name: 'http-test', version: '0' });
     await client.connect(new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${http.port}/mcp`)));
     const { tools } = await client.listTools();
-    expect(tools.length).toBe(7);
+    expect(tools.length).toBe(8);
     const r = await client.callTool({ name: 'hb_call_operation', arguments: { operation_id: 'hub.candidates.list' } });
     expect(r.isError).toBeFalsy();
     await client.close();
