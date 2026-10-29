@@ -5,7 +5,7 @@ import type { HubClient } from './http.js';
 import type { TokenManager } from './tokens.js';
 
 export const SERVER_NAME = 'hb-hub-mcp';
-export const SERVER_VERSION = '0.1.2';
+export const SERVER_VERSION = '0.1.3';
 
 /** Everything a tool needs. One per process; shared by every MCP session. */
 export interface AppContext {
