@@ -5,6 +5,14 @@
   "type": "module",
   "license": "MIT",
   "author": "Sanchit Patil",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Healthier-Business/hb-mcp.git"
+  },
+  "homepage": "https://github.com/Healthier-Business/hb-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/Healthier-Business/hb-mcp/issues"
+  },
   "keywords": [
     "mcp",
     "model-context-protocol",
