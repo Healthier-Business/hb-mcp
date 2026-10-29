@@ -1,0 +1,11 @@
+{
+  "name": "healthier-business",
+  "owner": { "name": "Healthier Business" },
+  "plugins": [
+    {
+      "name": "hb-hub",
+      "source": "./claude-plugin",
+      "description": "Hub API v2 MCP server: read-only by default, sandbox first."
+    }
+  ]
+}

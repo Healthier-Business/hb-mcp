@@ -1,0 +1,11 @@
+# Add to ~/.codex/config.toml (or a project's .codex/config.toml)
+[mcp_servers.hb-hub]
+command = "npx"
+args = ["-y", "@healthier-business/hub-mcp"]
+# Forward the key from your shell; it is never written to this file.
+env_vars = ["HB_API_KEY"]
+
+[mcp_servers.hb-hub.env]
+HB_BASE_URL = "https://YOUR-SANDBOX-URL"   # sandbox first; remove for the live Hub
+HB_READ_ONLY = "true"
+HB_TOOL_MODE = "compact"

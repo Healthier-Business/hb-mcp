@@ -1,0 +1,8 @@
+{
+  "name": "hb-hub",
+  "version": "0.1.0",
+  "description": "Use the Healthier Business Hub API v2 from Claude Code: read-only by default, sandbox first, live writes need a plan and an explicit yes.",
+  "author": { "name": "Healthier Business" },
+  "keywords": ["hub", "healthier-business", "mcp", "compliance"],
+  "mcpServers": "./.mcp.json"
+}

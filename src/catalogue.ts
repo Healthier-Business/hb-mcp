@@ -4,6 +4,12 @@ import type { Catalogue, CatalogueEvent, CatalogueOperation, EventCatalogue } fr
 
 export type { CatalogueEvent, CatalogueOperation } from './generator/build.js';
 
+const VERB_ACTION: Record<string, string> = {
+  book: 'create', create: 'create', add: 'create', new: 'create', make: 'create', invite: 'create', send: 'create', register: 'create',
+  cancel: 'cancel', delete: 'delete', remove: 'delete', withdraw: 'delete', release: 'release', update: 'update', edit: 'update', change: 'update',
+  list: 'list', find: 'list', search: 'list', get: 'show', show: 'show', read: 'show', download: 'download', hold: 'hold', reschedule: 'reschedule',
+};
+
 export class OperationCatalogue {
   readonly operations: CatalogueOperation[];
   readonly events: CatalogueEvent[];
@@ -84,6 +90,8 @@ export class OperationCatalogue {
           if (summary.includes(t)) score += 3;
           if (path.includes(t)) score += 2;
           if (desc.includes(t)) score += 1;
+          const action = VERB_ACTION[t];
+          if (action && id.split('.').pop() === action) score += 4;
         }
         if (score === 0) {
           continue;

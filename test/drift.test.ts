@@ -68,3 +68,14 @@ describe('generated catalogue vs the bundled spec', () => {
     expect(cat.operations.filter((o) => o.healthData)).toHaveLength(9);
   });
 });
+
+describe('package metadata', () => {
+  it('server version equals package.json version and the bin points at the CLI', async () => {
+    const pkg = JSON.parse(readFileSync(assetPath('package.json'), 'utf8'));
+    const { SERVER_VERSION } = await import('../src/context.js');
+    expect(SERVER_VERSION).toBe(pkg.version);
+    expect(pkg.bin['hb-hub-mcp']).toBe('dist/cli.js');
+    expect(pkg.name).toBe('@healthier-business/hub-mcp');
+    expect(Object.keys(pkg.dependencies).sort()).toEqual(['@modelcontextprotocol/sdk', 'zod']);
+  });
+});

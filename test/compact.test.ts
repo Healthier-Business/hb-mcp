@@ -256,3 +256,13 @@ describe('events', () => {
     expect(bad.isError).toBe(true);
   });
 });
+
+describe('search ranking', () => {
+  it('puts the obvious operation first for natural phrases', async () => {
+    const top = async (q: string) => (await h.call('hb_search_operations', { query: q, limit: 3 })).json.operations.map((o: any) => o.id);
+    expect(await top('book practical training')).toContain('practical-training.bookings.create');
+    expect(await top('list candidates')).toContain('hub.candidates.list');
+    expect(await top('create webhook')).toContain('webhooks.endpoints.create');
+    expect(await top('cancel booking')).toEqual(expect.arrayContaining([expect.stringMatching(/bookings\.cancel$/)]));
+  });
+});

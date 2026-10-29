@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "hb-hub": {
+      "command": "npx",
+      "args": ["-y", "@healthier-business/hub-mcp"],
+      "env": {
+        "HB_API_KEY": "${env:HB_API_KEY}",
+        "HB_BASE_URL": "${env:HB_BASE_URL}",
+        "HB_READ_ONLY": "true"
+      }
+    }
+  }
+}

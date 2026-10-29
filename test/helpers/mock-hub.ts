@@ -129,6 +129,7 @@ export class MockHub {
 
   revokeAllAccessTokens(): void {
     this.access.clear();
+    this.refresh.clear();
   }
 
   apiRequests(): RecordedRequest[] {

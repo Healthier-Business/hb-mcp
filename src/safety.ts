@@ -96,7 +96,7 @@ export function modeBadge(config: Config): string {
 
 export function writeNote(config: Config, op: CatalogueOperation): string {
   if (!isWrite(op)) {
-    return 'Read-only.';
+    return op.healthData ? 'Read-only. Involves health data.' : 'Read-only.';
   }
   const parts: string[] = [];
   if (config.mode === 'live') {

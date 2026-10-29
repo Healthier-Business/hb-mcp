@@ -32,7 +32,8 @@ export async function startHttpServer(ctx: AppContext, opts: HttpOptions): Promi
     throw new Error('Refusing to listen on a non-loopback address without HB_MCP_HTTP_TOKEN: anyone who could connect would act with your Hub key.');
   }
   const sessions = new Map<string, StreamableHTTPServerTransport>();
-  const allowedHosts = LOOPBACK.has(opts.host) ? ['127.0.0.1', 'localhost', '[::1]'] : undefined;
+  let boundPort = opts.port;
+  const loopbackHosts = () => ['127.0.0.1', 'localhost', '[::1]'].flatMap((h) => [h, `${h}:${boundPort}`]);
 
   const http = createServer(async (req: IncomingMessage, res: ServerResponse) => {
     const send = (status: number, body: unknown) => {
@@ -64,8 +65,8 @@ export async function startHttpServer(ctx: AppContext, opts: HttpOptions): Promi
           onsessioninitialized: (id) => {
             sessions.set(id, transport);
           },
-          enableDnsRebindingProtection: allowedHosts !== undefined,
-          allowedHosts,
+          enableDnsRebindingProtection: LOOPBACK.has(opts.host),
+          allowedHosts: LOOPBACK.has(opts.host) ? loopbackHosts() : undefined,
         });
         transport.onclose = () => {
           if (transport.sessionId) sessions.delete(transport.sessionId);
@@ -89,6 +90,7 @@ export async function startHttpServer(ctx: AppContext, opts: HttpOptions): Promi
   });
   const address = http.address();
   const port = typeof address === 'object' && address ? address.port : opts.port;
+  boundPort = port;
   log.info('streamable http listening', { host: opts.host, port });
   return {
     server: http,
