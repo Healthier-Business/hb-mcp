@@ -108,7 +108,7 @@ One tool per operation, generated from the bundled spec, named from the operatio
 | `clinical-appraisals` | 8 | 7 | 1 |
 | **Total** | **189** | **122** | **67** |
 
-Tool counts in full mode: all toolsets with writes on is 186 operation tools + 4 helpers = 190; read-only (default) is 121 read tools + 4 = 125 (`auth.me` is the only authentication tool). Use `HB_TOOLSETS` to stay under your client's limit, for example `HB_TOOLSETS=hub,occupational-health`.
+Tool counts in full mode: all toolsets with writes on is 186 operation tools + 4 helpers = 190; read-only (default) is 122 read tools + 4 = 126 (`auth.me` is the only authentication tool). Use `HB_TOOLSETS` to stay under your client's limit, for example `HB_TOOLSETS=hub,occupational-health`.
 
 The three credential operations (`auth.token.create`, `auth.refresh.create`, `auth.revoke.create`) are never exposed: the server exchanges the key and refreshes tokens itself, so a key or token never passes through a tool call.
 

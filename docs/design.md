@@ -32,7 +32,7 @@ Package `@healthier-business/hub-mcp`, binary `hb-hub-mcp`. A Model Context Prot
 
 ## Tool surface
 
-Compact (default, 8 tools): `hb_status`, `hb_search_operations`, `hb_describe_operation`, `hb_call_operation`, `hb_list_events`, `hb_describe_event`, `hb_verify_webhook_signature`. Full: one tool per operation (`hub_candidates_list`, ...) plus the knowledge tools, filtered by `HB_TOOLSETS`, and by `HB_READ_ONLY` (write tools are hidden while read-only).
+Compact (default, 7 tools): `hb_status`, `hb_search_operations`, `hb_describe_operation`, `hb_call_operation`, `hb_list_events`, `hb_describe_event`, `hb_verify_webhook_signature`. Full: one tool per operation (`hub_candidates_list`, ...) plus the knowledge tools, filtered by `HB_TOOLSETS`, and by `HB_READ_ONLY` (write tools are hidden while read-only).
 
 The three credential operations (`auth.token.create`, `auth.refresh.create`, `auth.revoke.create`) are never exposed as tools: the server does the exchange itself, so a key or token never passes through a tool call. `auth.me.show` is available.
 
@@ -43,3 +43,12 @@ validate against the spec -> operation allowed (read-only, toolset)? -> live wri
 ## Sandbox vs live
 
 Live is `https://hub.hbcompliance.co.uk` (the default). A sandbox base URL looks like `https://<portal host>/sandbox/<uuid>` or `https://<name>.sandbox.<domain>`; sandbox keys start `hbk_test_`. `HB_ENV=sandbox|live` overrides detection. With stdio the HTTP calls leave from the developer's own machine, so the key's IP allowlist sees that machine's address.
+
+## Decisions made while building
+
+- The server uses the SDK's low-level `Server` so tool input schemas are plain JSON Schema generated from the spec (the high-level `McpServer` wants zod shapes). `zod` is used for config and argument parsing.
+- Path and query values are coerced when unambiguous (`"55"` to 55, `"true"` to true) because models often send strings.
+- The generated catalogue stores each operation with its dereferenced schemas; full-mode tool schemas are slimmed (no examples, short descriptions) to keep the tool list small. `hb_describe_operation` returns the complete schema.
+- Binary responses (PDF, images, CSV) come back as base64 or text within the size cap; files are never written to disk. Uploads use `{filename, content_base64 | content_text, content_type}` for file fields.
+- Superseded tokens stay in the redactor for the life of the process, so a token the Hub echoes back later is still scrubbed.
+- `--http` binds to loopback by default with DNS-rebinding protection; any other host requires `HB_MCP_HTTP_TOKEN`.
