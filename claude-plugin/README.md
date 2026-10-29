@@ -5,7 +5,7 @@ This plugin lets Claude use the Healthier Business Hub API v2: look up candidate
 ## What it contains
 
 - **An MCP server**, `hb-hub`, started with `npx` from the public npm package [`@healthier-business/hub-mcp`](https://www.npmjs.com/package/@healthier-business/hub-mcp). The package is pinned to one exact version in `.mcp.json`. The source is public at [github.com/Healthier-Business/hb-mcp](https://github.com/Healthier-Business/hb-mcp).
-- **Skills**: `hub-safe-workflow` (how Claude should use the Hub tools safely), `/hb-hub:status` (which environment, key and scopes are in use) and `/hb-hub:sandbox-test` (try a workflow in a sandbox before going live).
+- **Skills**: `hub-safe-workflow` (how Claude should use the Hub tools safely, preferring the task tools such as `hb_find_candidate` and `hb_candidate_overview` for common jobs), `/hb-hub:status` (which environment, key and scopes are in use) and `/hb-hub:sandbox-test` (try a workflow in a sandbox before going live).
 
 ## What it does with your data
 

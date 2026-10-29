@@ -110,9 +110,9 @@ When it works in the sandbox, follow the `go-live-checklist` prompt (or `hb://gu
 
 ## Tools
 
-### Compact mode (default, `HB_TOOL_MODE=compact`): 8 tools
+### Compact mode (default, `HB_TOOL_MODE=compact`): 8 tools plus 7 task tools
 
-MCP clients degrade or cap beyond about 40 tools, so the default is a handful of meta tools that reach all 189 operations.
+MCP clients degrade or cap beyond about 40 tools, so the default is a handful of meta tools that reach all 189 operations, plus seven curated task tools for the common jobs (below). That is 15 tools with writes enabled and 13 while the server is read-only (the two task tools that write are hidden, like write tools in full mode).
 
 | Tool | What it does |
 | --- | --- |
@@ -125,9 +125,23 @@ MCP clients degrade or cap beyond about 40 tools, so the default is a handful of
 | `hb_verify_webhook_signature` | Local, no network: verify or compute `sha256=` HMAC of `{timestamp}.{body}` with the 300 second window. |
 | `hb_search_guides` | Local, no network, no key needed: keyword search over the 36 bundled guides (15 API, 21 developer portal); returns the best matches with a snippet and the `hb://guides/<name>` to read. Useful for clients that do not browse resources. |
 
+### Task tools (compact and full mode)
+
+Task tools do a common job in one call with sensible defaults, so an assistant does not have to search, describe and call several operations. They run through the same pipeline as `hb_call_operation` (spec validation, read-only default, live-write gate and plan-then-confirm, idempotency, secret redaction, size cap, error mapping), only call operations the key's scopes allow, and every result lists the operation ids it called (as readable text first, then structured data). They respect `HB_TOOLSETS`: a task tool is hidden when its portals are not enabled.
+
+| Tool | Kind | What it does |
+| --- | --- | --- |
+| `hb_find_candidate` | read | Find candidates by name, email, own reference or `candidate_ref`: a table with `candidate_ref`, name, email, roles, compliance status, next expiry and which portals have a record. Uses `hub.candidates.list` / `.show`. |
+| `hb_candidate_overview` | read | One line per record (status and dates) across online training, practical training, virtual BLS, references, DBS and right to work, registration monitoring, clinical appraisals, clinical interviews and occupational health, for the portals the key can reach; names the ones skipped and why. Occupational health is statuses and dates only, never answers, clearance detail or documents (see `hb://guides/health-data-and-privacy`). |
+| `hb_account_summary` | read | The key (name, expiry, scopes), credits and balances per portal, webhook endpoints with health (active, consecutive failures, last response) and recent deliveries. Webhook URLs are shown without query strings. |
+| `hb_needs_attention` | read | Failed or disabled webhook endpoints, unacknowledged DBS/RTW and registration alerts, bookings awaiting payment, appraisals awaiting documents, expired or lapsing online training, expired reference requests, and occupational health counts (counts only). |
+| `hb_go_live_check` | read | Readiness report: environment, key type against environment, wildcard and expiry warnings, scopes against the `portals` you say you need, webhook endpoints present and healthy, a note that the IP allowlist is not visible through the API, and the remaining manual steps of the going-live guide. |
+| `hb_book_practical_training` | write | Two calls. Call 1 (candidate, optional course, location, dates) returns session options with credits and sends nothing; call 2 with `event_id`, `pay_option`, the agency contact and `confirm: true` holds the place and books it, with idempotency keys. `invite: true` emails the candidate an invitation instead. `confirm: true` is required in every environment; on live the server must also allow live writes. |
+| `hb_setup_sandbox_webhook` | write, sandbox only | Creates a webhook endpoint for an https URL with chosen events (or a default set), sends a test event and reports the delivery. Refuses on live. The signing secret is never returned: it is withheld and scrubbed; pass `save_secret_to` (a new file, owner-only) to keep it. |
+
 ### Full mode (`HB_TOOL_MODE=full`)
 
-One tool per operation, generated from the bundled spec, named from the operation id (`hub.candidates.list` becomes `hub_candidates_list`), plus `hb_status`, `hb_list_events`, `hb_describe_event`, `hb_verify_webhook_signature` and `hb_search_guides`. Path and query parameters are top-level arguments, `body` is the JSON body. Annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`) come from the method and the spec's flags. While `HB_READ_ONLY=true`, write tools are hidden.
+One tool per operation, generated from the bundled spec, named from the operation id (`hub.candidates.list` becomes `hub_candidates_list`), plus `hb_status`, `hb_list_events`, `hb_describe_event`, `hb_verify_webhook_signature`, `hb_search_guides` and the task tools above. Path and query parameters are top-level arguments, `body` is the JSON body. Annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`) come from the method and the spec's flags. While `HB_READ_ONLY=true`, write tools are hidden.
 
 | Toolset (`HB_TOOLSETS`) | Operations | Reads | Writes |
 | --- | --- | --- | --- |
@@ -145,7 +159,7 @@ One tool per operation, generated from the bundled spec, named from the operatio
 | `clinical-appraisals` | 8 | 7 | 1 |
 | **Total** | **189** | **122** | **67** |
 
-Tool counts in full mode: all toolsets with writes on is 186 operation tools + 5 helpers = 191; read-only (default) is 122 read tools + 5 = 127 (`auth.me` is the only authentication tool). Use `HB_TOOLSETS` to stay under your client's limit, for example `HB_TOOLSETS=hub,occupational-health`.
+Tool counts in full mode: all toolsets with writes on is 186 operation tools + 5 helpers + 7 task tools = 198; read-only (default) is 122 read tools + 5 + 5 task tools = 132 (`auth.me` is the only authentication tool). Use `HB_TOOLSETS` to stay under your client's limit, for example `HB_TOOLSETS=hub,occupational-health`.
 
 The three credential operations (`auth.token.create`, `auth.refresh.create`, `auth.revoke.create`) are never exposed: the server exchanges the key and refreshes tokens itself, so a key or token never passes through a tool call.
 
@@ -213,11 +227,12 @@ CLI: `hb-hub-mcp [--http [--port N] [--host H]] [--doctor] [--version] [--help]`
 | Nothing blind-retried | A write is never retried automatically. A dropped connection returns the `idempotency_key` to reuse; a 401 is refreshed once (safe: not processed); 429 and 5xx on a write are returned to you. Reads retry on 429/502/503/504/network errors. |
 | Idempotency | Writes that support it get an `Idempotency-Key` (a uuid, shown in the result). Same key and body within 24 hours replays the first answer. |
 | Validation before sending | Path, query, headers and body are checked against the spec; a bad call sends nothing. |
-| Secrets | Key, tokens and webhook secrets are registered with a redactor that scrubs every tool answer and log line, even if the Hub echoes one. Response bodies are never logged. |
+| Secrets | Key, tokens and webhook secrets are registered with a redactor that scrubs every tool answer and log line, even if the Hub echoes one. A webhook signing secret (`whsec_...`) is scrubbed by pattern too, so one the Hub creates is never shown in a tool answer (the Hub shows it only once: `hb_setup_sandbox_webhook` can save it to a file). Response bodies are never logged. |
 | Health data | Operations flagged `x-health-data` return a `health_data` marker; the instructions tell the model to use only what the task needs. |
 | Size | Answers over `HB_MAX_RESPONSE_CHARS` are truncated with a notice; use `fields` (dotted paths) and filters. |
 | Scope of tokens | One refresher per process (single-flight), the single-use refresh token is replaced the moment a new pair arrives, and the 10 a minute auth throttle and `Retry-After` are respected. |
 | Credentials | Credential endpoints are not tools. |
+| Task tools | Same pipeline as `hb_call_operation`. Tools that write are hidden while read-only; `hb_book_practical_training` needs `confirm: true` after a plan; `hb_setup_sandbox_webhook` refuses on live. |
 
 Money is integer pence with a currency; credits are units. The tool descriptions say which operations use credits.
 

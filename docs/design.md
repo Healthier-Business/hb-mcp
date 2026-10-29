@@ -26,6 +26,7 @@ Package `@healthier-business/hub-mcp`, binary `hb-hub-mcp`. A Model Context Prot
 | `execute.ts` | The one execution pipeline shared by compact and full tools (validate, gate, call, paginate, select, cap, mark). |
 | `output.ts` | `fields` selection, size cap with truncation notice. |
 | `tools/compact.ts`, `tools/full.ts`, `tools/knowledge.ts` | Tool definitions per mode. |
+| `tools/tasks.ts`, `tools/tasks-read.ts`, `tools/tasks-write.ts`, `tools/task-support.ts` | The curated task tools (`hb_find_candidate`, `hb_candidate_overview`, `hb_account_summary`, `hb_needs_attention`, `hb_go_live_check`, `hb_book_practical_training`, `hb_setup_sandbox_webhook`) and the helper that runs operations through the executor. |
 | `guides.ts` | Load the bundled guides (`content/guides`, then `content/guides/portal`, served as `hb://guides/portal-<name>`) and keyword-search them for `hb_search_guides`. |
 | `resources.ts`, `prompts.ts`, `instructions.ts` | MCP resources, prompts, server instructions. |
 | `server.ts` | Wire a low-level MCP `Server` to the registry. |
@@ -33,7 +34,14 @@ Package `@healthier-business/hub-mcp`, binary `hb-hub-mcp`. A Model Context Prot
 
 ## Tool surface
 
-Compact (default, 8 tools): `hb_status`, `hb_search_operations`, `hb_describe_operation`, `hb_call_operation`, `hb_list_events`, `hb_describe_event`, `hb_verify_webhook_signature`, `hb_search_guides`. Full: one tool per operation (`hub_candidates_list`, ...) plus the knowledge tools, filtered by `HB_TOOLSETS`, and by `HB_READ_ONLY` (write tools are hidden while read-only).
+Compact (default, 8 tools plus the task tools): `hb_status`, `hb_search_operations`, `hb_describe_operation`, `hb_call_operation`, `hb_list_events`, `hb_describe_event`, `hb_verify_webhook_signature`, `hb_search_guides`. Full: one tool per operation (`hub_candidates_list`, ...) plus the knowledge tools, filtered by `HB_TOOLSETS`, and by `HB_READ_ONLY` (write tools are hidden while read-only).
+
+Task tools (7, offered in compact and full mode, added by `buildTools`): small jobs built on the generic pipeline. Each call goes through `Executor.call` (so validation, gates, idempotency, redaction, size cap and error mapping are the same), is checked against the key's scopes first (`auth.me.show`, wildcards `*` and `portal:*` count), skips what is not allowed and says so, and reports the operation ids it called. Five read (`hb_find_candidate`, `hb_candidate_overview`, `hb_account_summary`, `hb_needs_attention`, `hb_go_live_check`); two write and are hidden while the server is read-only, like write tools in full mode, and hidden when their toolset is disabled. Read tools return a readable text block and a second block of structured data.
+
+- `hb_candidate_overview` keeps health data out by allowlisting fields: occupational health is read only through `occupational-health.requests.list` and shown as request type, status label and dates; clearance, form, documents, answers, names and contact details are never copied. `hb_needs_attention` reads occupational health only as counts (`requests.stats`).
+- `hb_book_practical_training` is plan then act in every environment: without `confirm` it only reads (candidate, sessions, credits) and returns options or a plan; with `confirm: true` it holds the place and books it with derived idempotency keys (`<key>-hold`, `<key>-book`), and releases its own hold if the booking is rejected (not when the outcome is unknown). The tool-level `confirm` is the user's approval for the live gate of both operations.
+- `hb_setup_sandbox_webhook` refuses on live. The Hub shows a webhook signing secret once, in the create answer. The executor offers an in-process `onResponse` hook (never a tool argument) so the tool can capture it, register it with the redactor and optionally write it to a new owner-only file (`save_secret_to`, never overwriting); it is never in the tool answer or a log. The redactor also scrubs `whsec_` strings by pattern, so the generic tools no longer echo a secret the Hub creates.
+- `hb_go_live_check` cannot see the IP allowlist (the API does not expose it) and says so.
 
 The three credential operations (`auth.token.create`, `auth.refresh.create`, `auth.revoke.create`) are never exposed as tools: the server does the exchange itself, so a key or token never passes through a tool call. `auth.me.show` is available.
 
