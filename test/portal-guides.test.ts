@@ -95,3 +95,35 @@ describe('developer portal guides', () => {
     expect((await h.call('hb_search_guides', { query: '' })).isError).toBe(true);
   });
 });
+
+describe('guide consistency', () => {
+  it('no guide says a test key starts with plain hbk_ plus 40 characters, or that test keys look like live ones', () => {
+    for (const g of loadGuides()) {
+      expect(g.text, g.slug).not.toMatch(/`hbk_`\s*\+\s*40/);
+      expect(g.text, g.slug).not.toMatch(/hbk_[A-Za-z0-9]{40}\b/);
+      expect(g.text, g.slug).not.toMatch(/exactly like (real|live)/i);
+      expect(g.text, g.slug).not.toMatch(/hbk_YOUR_TEST_KEY/);
+    }
+  });
+
+  it('describes the sandbox as available, with the real base URL forms', () => {
+    const guides = loadGuides();
+    for (const g of guides) {
+      expect(g.text, g.slug).not.toMatch(/sandbox (is|will be) (coming|not (yet )?(live|open|available))|not live yet|not published yet|sandbox is planned/i);
+      expect(g.text, g.slug).not.toMatch(/\.sandbox\./);
+    }
+    const guide = guides.find((g) => g.slug === 'testing-and-sandbox')!;
+    expect(guide.text).toContain('/sandbox/<sandbox-id>/api/v2');
+    expect(guide.text).toContain('/sandbox/api/v2');
+    expect(guide.text).toContain('hbk_test_');
+  });
+
+  it('states the same webhook retry and switch-off facts everywhere', () => {
+    for (const slug of ['webhooks', 'portal-webhooks']) {
+      const g = loadGuides().find((x) => x.slug === slug)!;
+      expect(g.text, slug).toMatch(/five attempts|5 attempts/);
+      expect(g.text, slug).toMatch(/25/);
+      expect(g.text, slug).toMatch(/15 minutes/);
+    }
+  });
+});

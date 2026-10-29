@@ -26,7 +26,7 @@ export async function runDoctor(config: Config, fetchImpl: typeof fetch = fetch)
   if (!config.apiKey) {
     add('fail', 'HB_API_KEY is not set.');
   } else {
-    add('ok', `HB_API_KEY is set (${config.apiKey.startsWith('hbk_test_') ? 'sandbox test key' : config.apiKey.startsWith('hbk_') ? 'live-style key' : 'unexpected prefix: keys start with hbk_'}).`);
+    add('ok', `HB_API_KEY is set (${config.apiKey.startsWith('hbk_test_') ? 'sandbox test key' : config.apiKey.startsWith('hbk_') ? 'live key' : 'unexpected prefix: keys start with hbk_'}).`);
     if (config.apiKey.startsWith('hbk_test_') && config.mode === 'live') add('warn', 'A test key with a LIVE base URL will not work. Set HB_BASE_URL to your sandbox.');
   }
 

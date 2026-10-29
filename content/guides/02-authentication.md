@@ -11,7 +11,7 @@ The Hub API uses one authentication scheme for every portal. You exchange a long
 
 ## The key and the tokens
 
-An **API key** starts with `hbk_`. You create it on the Developer page in the Hub (see [getting started](01-getting-started.md)). It is the root credential for your integration: it does not expire unless you gave it an expiry date, and it can mint as many tokens as it needs.
+A live **API key** starts with `hbk_` (never `hbk_test_`) and is 52 characters long. A sandbox **test key** starts with `hbk_test_` and works only in its sandbox (see [testing and sandbox](12-testing-and-sandbox.md)). You create it on the Developer page in the Hub (see [getting started](01-getting-started.md)). It is the root credential for your integration: it does not expire unless you gave it an expiry date, and it can mint as many tokens as it needs.
 
 An **access token** is what you send on each call, in the header `Authorization: Bearer <access_token>`. It lasts 60 minutes (3600 seconds). A **refresh token** lasts 7 days (604800 seconds) and has one purpose: to get the next access token without presenting the key again.
 

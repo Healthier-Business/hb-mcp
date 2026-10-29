@@ -7,7 +7,7 @@ Every call to the API is made with a short-lived **access token**. You get one b
 
 | | Test key (sandbox) | Live key (HB Hub) |
 | --- | --- | --- |
-| Looks like | `hbk_` + 40 characters | `hbk_` + 48 characters (52 in all) |
+| Looks like | `hbk_test_` + 40 characters (49 in all) | `hbk_` + 48 characters (52 in all), never `hbk_test_` |
 | Works against | Your sandbox only | The live Hub only |
 | Made in | The console, **API keys** | The Developer page of HB Hub |
 | Shown | Once, when made or rolled | Once, when made or regenerated |
@@ -16,7 +16,7 @@ Every call to the API is made with a short-lived **access token**. You get one b
 
 1. **Sandbox picker.** Keys belong to one sandbox. Pick the sandbox whose keys you want.
 2. **New key** opens the creation dialog.
-3. A key row. The key itself is never shown again; you see its first characters (`hbk_pWDH…`) so you can recognise it.
+3. A key row. The key itself is never shown again; you see its first characters (`hbk_test_…`) so you can recognise it.
 4. **Status**: *Active*, *Off* (switched off by you) or *Expired* (its expiry date passed).
 
 Columns: **Name**, **Key** (prefix), **Access** (*All scopes* or *N scopes*), **Limit** (calls per hour), **Expires**, **Last used**, **Status**. Filters: **Status** (active, off, expired) and **Scope**; search matches the name and the prefix.
@@ -68,7 +68,7 @@ Use the row menu (the three dots at the right of the row):
    ```bash
    curl -X POST "https://<developer-site>/sandbox/<sandbox-id>/api/v2/auth/token" \
      -H "Content-Type: application/json" \
-     -d '{"api_key": "hbk_YOUR_TEST_KEY"}'
+     -d '{"api_key": "hbk_test_YOUR_KEY"}'
    ```
 
 2. **Read the answer**

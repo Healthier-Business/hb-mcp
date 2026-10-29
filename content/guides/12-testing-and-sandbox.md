@@ -1,49 +1,49 @@
 # Testing and the sandbox
 
-> **The sandbox is coming with the developer portal and is not live yet.** It is being built as part of the HB Developers portal, which is a separate site from the Hub. Everything about the sandbox in this guide describes what is planned. When the sandbox opens, this guide will be updated with its address and exact details. Until then, use the careful approach to testing against production described in the second half of this guide.
+> **The sandbox is available now, in the HB Developers portal.** The portal is a separate site from the Hub. You sign up there, create a sandbox, make a test key and call the sandbox with it. The portal guides explain every screen: start with [the portal overview](portal/01-overview.md) and [sandboxes](portal/06-sandboxes.md) (as resources, `hb://guides/portal-overview` and `hb://guides/portal-sandboxes`).
 
 Testing an integration against live data is risky: a test booking can take a real seat, a test candidate can be emailed, and credits can be spent. The sandbox exists so that you can build and test everything first without any of that, and then go live by changing a base URL and a key.
 
-## What the sandbox will be
+## What the sandbox is
 
 The sandbox is a separate environment that behaves like the Hub API but is not connected to the Hub. It is built and run by the HB Developers portal, and nothing you do in it touches Hub data. In particular:
 
-- **It uses synthetic data only.** You get a sandbox filled with made-up candidates, bookings and requests. Nothing in it is a real person.
-- **It sends no emails or SMS.** Where the real API would email a candidate, the sandbox does not send anything.
-- **It has no real usage, limits or billing.** Spending credits or hitting an hourly limit does not cost you anything, and there is no cost for creating sandboxes.
+- **It uses synthetic data only.** Each sandbox starts filled with made-up candidates, bookings and requests. Nothing in it is a real person.
+- **It sends no emails or SMS.** Where the real API would email a candidate, the sandbox keeps the message in the portal's Inbox instead.
+- **It costs nothing.** Credits and payments are pretend, and creating sandboxes is free.
 - **It is stateful.** What you create in a sandbox stays there. A booking you make can be read back, changed and cancelled, as with the real API. Each sandbox has its own data.
 - **It covers every portal at once**, with the same endpoints, scopes, validation, list format, pagination and errors as the real API. The sandbox is generated from the same OpenAPI specification as the documentation, which is how the two stay in step.
-- **You can have as many sandboxes as you need** under one developer account, for example one for development and one for your automated tests, and you can reset a sandbox back to its starting data.
+- **You can have several sandboxes** under one developer account (the portal shows the limit), for example one for development and one for your automated tests, and you can reset a sandbox back to its starting data. A reset also removes the webhook endpoints, delivery logs and inbox of that sandbox, so create the endpoints again afterwards. Your sandbox keys are kept.
 
 ### Test keys and base URLs
 
-Sandbox keys start with `hbk_test_`, so they can never be confused with production keys, which start with `hbk_`. Each sandbox has its own base URL. The production API is at `https://hub.hbcompliance.co.uk/api/v2`, and a sandbox is planned to answer at an address of the form `https://{sandbox}.sandbox.{domain}/api/v2`. The exact host will be shown in the developer portal when you create a sandbox. There will also be a shared address where the test key itself selects the sandbox.
+Test keys start with `hbk_test_` (that prefix followed by 40 random characters, 49 in all). Live keys start with `hbk_` and never with `hbk_test_` (that prefix followed by 48 random characters, 52 in all). A test key works only against its sandbox and a live key only against the live Hub, so the two cannot be confused.
 
-Authentication is the same as in production. You call `POST /auth/token` with your test key, receive an access token and a refresh token in the same shape, and send the token as a bearer token. You choose scopes for a test key just as you do for a real one, so you can try out a least-privilege key before you create it for real. Code that works against one works against the other when you change only the base URL and the key.
+The production API is at `https://hub.hbcompliance.co.uk/api/v2`. A sandbox is served from the developer portal's host, in one of two forms:
 
-If you give a test key an IP allowlist, the sandbox accepts and validates the list, but it checks it only if you switch enforcement on for that sandbox. That lets you test your handling of `403 ip_not_allowed` without locking yourself out by accident.
+| Form | Base URL | Notes |
+| --- | --- | --- |
+| By sandbox id | `https://<developer-portal-host>/sandbox/<sandbox-id>/api/v2` | The address shown on the sandbox page in the portal. The sandbox is named in the path. |
+| By key | `https://<developer-portal-host>/sandbox/api/v2` | The test key you exchange identifies the sandbox, so you can keep the same code and swap only the key. |
+
+Both reach the same data. Copy the exact address from the sandbox page in the portal. If you use this MCP server, set `HB_BASE_URL` to the sandbox address (the part before `/api/v2` is enough, as with the live host) and `HB_API_KEY` to the test key.
+
+Authentication is the same as in production. You call `POST /auth/token` with your test key, receive an access token and a refresh token in the same shape, and send the token as a bearer token. You choose scopes for a test key just as you do for a real one, so you can try out a least-privilege key before you create it for real. Code that works against one works against the other when you change only the base URL and the key. See [API keys and token exchange](portal/07-api-keys-and-tokens.md).
 
 ### Webhooks in the sandbox
 
-You will be able to create webhook endpoints in a sandbox, choose events, rotate the secret, see a delivery log and redeliver, as in production. Signatures use the same algorithm and the same headers as the real Hub, so the verification code in [webhooks](10-webhooks.md) works unchanged.
+You can create webhook endpoints in a sandbox, choose events, rotate the secret, see a delivery log and send a delivery again, as in production. Signatures use the same algorithm and the same headers as the real Hub, so the verification code in [webhooks](10-webhooks.md) works unchanged. The retry schedule and the automatic switch-off are the same as in production (five attempts, 25 failed deliveries in a row), with one difference for test events, described in [webhooks](10-webhooks.md). Only an https address that you registered is ever called.
 
-Because real events depend on things people do (a candidate finishing a questionnaire, staff recording a clearance), a real integration cannot see its webhooks unless something happens. So the portal is planned to have a **simulate** panel. You pick an event, pick a record (or have one generated), edit the payload if you wish, and send it to your endpoint. Actions you take in the sandbox through the API, such as creating a booking or an occupational health request, produce the same events the real Hub would. There are also one-button simulators for things staff or candidates do in real life, such as advancing an occupational health request to full clearance, a candidate completing the questionnaire, marking a booking attended, issuing a certificate or expiring a renewal.
+Because real events depend on things people do (a candidate finishing a questionnaire, staff recording a clearance), an integration would not see its webhooks unless something happened. The portal therefore has **Simulate**: you run a simulation such as a candidate paying or an interview ending, and the sandbox changes as the real event would and sends the signed webhook events it raises. You can also send the example of any event to your endpoint from the webhooks page. See [simulate](portal/11-simulate.md) and the portal [webhooks](portal/09-webhooks.md) guide.
 
-### Faults on demand
+### Other tools in the portal
 
-Good error handling needs errors, and real errors are hard to produce on demand. The sandbox is planned to let you ask for them:
+- **Request log.** Every call a sandbox answered, with both bodies, the error code and the request id. See [request log and debugging](portal/13-request-log-and-debugging.md).
+- **Data page.** A read-only view of every table in a sandbox, so you can check what your calls changed. See [data page](portal/10-data-page-and-json-viewer.md).
+- **API Playground.** Build and send requests from the console, and copy them as code. See [API Playground](portal/12-api-playground.md).
+- **Inbox.** The emails and texts the sandbox would have sent.
 
-- a delay header, `X-Sandbox-Delay`, to slow an answer down so that you can test your timeouts;
-- a failure header, `X-Sandbox-Fail`, for example `X-Sandbox-Fail: 503`, to make a call fail with the status you name;
-- magic values, such as a candidate named `Fail Candidate`, which is planned to return a `422`;
-- a wallet set to zero, to produce `insufficient_credits`;
-- a webhook endpoint that times out.
-
-A "Testing" page in the developer portal will list the exact values and what each produces. Do not rely on any detail of these beyond what that page says when it is published.
-
-### Other planned tools
-
-The portal is also planned to include a viewer that shows the data in a sandbox in a layout similar to the Hub's own screens, a log of every API call and webhook delivery with the option to replay a call or copy it as a `curl` command, and a sandbox clock, which you can set to test things that depend on dates, such as renewals that fall due or bookings in the past.
+If you need an error on demand, use real error cases: a missing scope, a bad body (`422`), an unknown id (`404`), or the rate limit. This guide does not describe any special fault headers or magic values, because the portal guides do not document them.
 
 ## Going from the sandbox to production
 
@@ -56,9 +56,9 @@ When your integration works in the sandbox, moving to production takes four chan
 
 Before you switch, work through the checklist in [going live](13-going-live.md).
 
-## Testing safely before the sandbox is open
+## Testing safely against production
 
-Until the sandbox is available, you can still test responsibly against production, as long as you take care. Part of the risk is that some calls have real effects. For instance:
+Prefer the sandbox. If you must test against production (for example to check your live key and network path just before going live), do it carefully. Part of the risk is that some calls have real effects. For instance:
 
 - creating a candidate emails them an activation link, unless you add them as inactive;
 - assigning online training emails the candidate and may use credits;
@@ -80,7 +80,7 @@ The following precautions keep your tests harmless.
 
 ### A client that knows which environment it is in
 
-The samples below choose the base URL from the key's prefix, so that a test key can never be sent to production by mistake and a production key cannot be sent to a sandbox. They also refuse to make write calls to production unless you opt in with `HB_ALLOW_PRODUCTION_WRITES=1`, which is a simple guard against running a test script against the live API by accident. Because the sandbox address is not published yet, a test key needs the sandbox base URL in `HB_SANDBOX_BASE_URL`, and the sample stops with a clear message if it is not set.
+The samples below choose the base URL from the key's prefix, so that a test key can never be sent to production by mistake and a production key cannot be sent to a sandbox. They also refuse to make write calls to production unless you opt in with `HB_ALLOW_PRODUCTION_WRITES=1`, which is a simple guard against running a test script against the live API by accident. Because each sandbox has its own address, a test key needs the sandbox base URL in `HB_SANDBOX_BASE_URL`, and the sample stops with a clear message if it is not set.
 
 ### cURL
 
@@ -118,7 +118,7 @@ export function resolveEnvironment(apiKey, env = process.env) {
 
   if (apiKey.startsWith('hbk_test_')) {
     if (!env.HB_SANDBOX_BASE_URL) {
-      throw new Error('This is a test key. Set HB_SANDBOX_BASE_URL to your sandbox base URL (not published yet).');
+      throw new Error('This is a test key. Set HB_SANDBOX_BASE_URL to your sandbox base URL.');
     }
 
     return { name: 'sandbox', baseUrl: env.HB_SANDBOX_BASE_URL.replace(/\/$/, ''), allowWrites: true };
@@ -175,7 +175,7 @@ function resolve_environment(string $apiKey): array
         $sandbox = (string) getenv('HB_SANDBOX_BASE_URL');
 
         if ($sandbox === '') {
-            throw new RuntimeException('This is a test key. Set HB_SANDBOX_BASE_URL to your sandbox base URL (not published yet).');
+            throw new RuntimeException('This is a test key. Set HB_SANDBOX_BASE_URL to your sandbox base URL.');
         }
 
         return ['name' => 'sandbox', 'baseUrl' => rtrim($sandbox, '/'), 'allowWrites' => true];
@@ -258,7 +258,7 @@ def resolve_environment(api_key, env=os.environ):
     if api_key.startswith("hbk_test_"):
         sandbox = env.get("HB_SANDBOX_BASE_URL")
         if not sandbox:
-            raise RuntimeError("This is a test key. Set HB_SANDBOX_BASE_URL to your sandbox base URL (not published yet).")
+            raise RuntimeError("This is a test key. Set HB_SANDBOX_BASE_URL to your sandbox base URL.")
         return {"name": "sandbox", "base_url": sandbox.rstrip("/"), "allow_writes": True}
 
     if api_key.startswith("hbk_"):

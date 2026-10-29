@@ -43,7 +43,7 @@ validate against the spec -> operation allowed (read-only, toolset)? -> live wri
 
 ## Sandbox vs live
 
-Live is `https://hub.hbcompliance.co.uk` (the default). A sandbox base URL looks like `https://<portal host>/sandbox/<uuid>` or `https://<name>.sandbox.<domain>`; sandbox keys start `hbk_test_`. `HB_ENV=sandbox|live` overrides detection. With stdio the HTTP calls leave from the developer's own machine, so the key's IP allowlist sees that machine's address.
+Live is `https://hub.hbcompliance.co.uk` (the default). A sandbox base URL looks like `https://<portal host>/sandbox/<uuid>`; sandbox keys start `hbk_test_`. `HB_ENV=sandbox|live` overrides detection. With stdio the HTTP calls leave from the developer's own machine, so the key's IP allowlist sees that machine's address.
 
 ## Decisions made while building
 

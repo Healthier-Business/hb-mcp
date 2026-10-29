@@ -59,11 +59,11 @@ An opened delivery shows the body that was sent as a JSON tree, and every attemp
 
 Answer any **2xx** status within the timeout to acknowledge an event. Anything else (a 4xx or 5xx status, a redirect, no answer) is retried: up to **5 attempts** in all, pausing **1 minute, 5 minutes, 15 minutes and 1 hour** before each retry. The log shows each attempt.
 
-An endpoint that fails **25 deliveries in a row** is switched **off**. Fix the receiver, then switch it on again in **Settings**.
+A delivery counts as failed when its fifth attempt fails; a delivery that succeeds sets the count back to zero. An endpoint that fails **25 deliveries in a row** is switched **off**; this is the same schedule and limit as the live Hub. Fix the receiver, then switch it on again in **Settings**.
 
 ### Try it
 
-* **Send test event** posts a `webhook.test` event to your address and tells you to look at the log. Test events are never retried and do not count as failures. The endpoint must be active (*The webhook is switched off. Switch it on to send a test event.* otherwise).
+* **Send test event** posts a `webhook.test` event to your address and tells you to look at the log. In a sandbox, test events are tried once, never retried, and do not count as failures (on the live Hub a test event follows the same retry schedule as a real event and counts like one: see [webhooks](hb://guides/webhooks)). The endpoint must be active (*The webhook is switched off. Switch it on to send a test event.* otherwise).
 * **Simulate an event** sends the example of the event you pick, signed, to your address now, whether or not the endpoint listens to it. Its `candidate_ref` is replaced by a real candidate of your sandbox when the event has one. For events that need something to happen first, use [Simulate](hb://guides/portal-simulate) instead, which really changes the sandbox.
 * In the delivery log, the row menu (three dots) has **View details** and **Send again**; the second sends the same event once more, with the same `event_id`.
 

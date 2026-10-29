@@ -152,7 +152,7 @@ The developer portal is where a developer signs up, makes sandboxes, test keys a
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `HB_API_KEY` | none | The `hbk_` API key. Environment only; never a tool argument. |
-| `HB_BASE_URL` | `https://hub.hbcompliance.co.uk` | **Live** by default. A sandbox looks like `https://<portal host>/sandbox/<uuid>` or `https://<name>.sandbox.<domain>`. `http` is allowed only for localhost. |
+| `HB_BASE_URL` | `https://hub.hbcompliance.co.uk` | **Live** by default. A sandbox looks like `https://<portal host>/sandbox/<uuid>`. `http` is allowed only for localhost. |
 | `HB_ENV` | detected | `live` or `sandbox`: overrides detection. An unrecognised host is treated as **live**. |
 | `HB_TOOL_MODE` | `compact` | `compact` (8 tools) or `full` (one per operation). |
 | `HB_TOOLSETS` | all | Comma list of portals (full mode, and a limit on `hb_call_operation` too). |

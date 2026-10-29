@@ -16,7 +16,7 @@ You can drive a sandbox from any HTTP client. The console gives you the base add
 
    ```bash
    BASE="https://<developer-site>/sandbox/<sandbox-id>/api/v2"
-   KEY="hbk_YOUR_TEST_KEY"
+   KEY="hbk_test_YOUR_KEY"
    ```
 
 2. **Exchange the key for a token**

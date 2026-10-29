@@ -80,10 +80,10 @@ export function statusTool(ctx: AppContext): ToolDefinition {
           const me = res.json as { client_id?: number; key?: { name?: string; prefix?: string; scopes?: string[]; expires_at?: string | null } };
           ctx.keyScopes = me.key?.scopes ?? [];
           status.auth = { configured: true, ok: true, client_id: me.client_id, key: me.key, session: ctx.tokens.summary() };
-          if (me.key?.prefix?.startsWith('hbk_test') && c.mode === 'live') {
+          if (me.key?.prefix?.startsWith('hbk_test_') && c.mode === 'live') {
             warnings.push('The key looks like a sandbox test key but the base URL is treated as LIVE.');
           }
-          if (!me.key?.prefix?.startsWith('hbk_test') && c.mode === 'sandbox') {
+          if (!me.key?.prefix?.startsWith('hbk_test_') && c.mode === 'sandbox') {
             warnings.push('A non-test key is being sent to a URL treated as sandbox. Check HB_BASE_URL and HB_ENV.');
           }
         } catch (e) {

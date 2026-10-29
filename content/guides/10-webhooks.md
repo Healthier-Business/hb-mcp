@@ -509,7 +509,9 @@ The statuses of a delivery are `pending` (queued, not yet tried), `retrying` (tr
 
 If deliveries to an endpoint keep failing, Hub eventually stops sending to it. Every delivery that fails its fifth attempt adds one to the endpoint's `consecutive_failures`. A successful delivery resets the count to zero. When the count reaches **25**, Hub sets the endpoint to `is_active: false`, and events are no longer sent to it. Deliveries still waiting for it are marked failed.
 
-You will see this in the `is_active` and `consecutive_failures` fields of the endpoint, and on the Developer page. Fix your receiver, then switch the endpoint on again, either on the Developer page or with `PUT /webhooks/{id}` and `{"is_active": true}`. Switching it on also resets the failure count. Events that happened while it was off are not queued for later, so if you need them, fetch what you missed through the API.
+You will see this in the `is_active` and `consecutive_failures` fields of the endpoint, and on the Developer page. This is the same in a sandbox of the developer portal, with one difference: there a `webhook.test` event is tried once, never retried, and does not count towards the 25. On the live Hub a test event follows the same schedule as a real event, so a test event that fails all five attempts adds one to `consecutive_failures` like any other delivery.
+
+Fix your receiver, then switch the endpoint on again, either on the Developer page or with `PUT /webhooks/{id}` and `{"is_active": true}`. Switching it on also resets the failure count. Events that happened while it was off are not queued for later, so if you need them, fetch what you missed through the API.
 
 ## Delivery log, redelivery and test events
 

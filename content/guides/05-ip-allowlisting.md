@@ -76,7 +76,7 @@ To prove the list works, make a call from an address that is not on it and check
 - run it from a second server that is not on the list;
 - temporarily remove your server's address from the list, call, and add it back (the change is effective at once).
 
-Test the exchange as well as an ordinary call, since both are checked. The sandbox of the HB developer portal is planned to be able to switch the same check on, so that you can test your error handling without touching your production key. See [testing and sandbox](12-testing-and-sandbox.md).
+Test the exchange as well as an ordinary call, since both are checked. To rehearse your error handling without touching your production key, use a test key in a sandbox of the HB developer portal. See [testing and sandbox](12-testing-and-sandbox.md).
 
 ## Recovering from a lock-out
 

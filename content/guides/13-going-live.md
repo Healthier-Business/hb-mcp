@@ -2,7 +2,7 @@
 
 Going live means pointing your integration at the production API with a real key, real candidates and real consequences. This guide gives you a checklist to work through first, explains the two ways of managing production keys, and describes the Developer role, which decides who in your organisation may do it.
 
-If you have been using the sandbox, read [testing and sandbox](12-testing-and-sandbox.md) first. The sandbox is not open yet, so you may well be testing against production with care, as that guide describes. Either way, the checklist below applies.
+If you have been using the sandbox, read [testing and sandbox](12-testing-and-sandbox.md) first. The sandbox is open in the HB Developers portal, so you can test there without touching production. Either way, the checklist below applies.
 
 ## The checklist
 
@@ -328,7 +328,7 @@ This is the way described in [getting started](01-getting-started.md). A person 
 
 ### By connecting your HB Hub account to the developer portal
 
-The HB Developers portal, where the sandbox will live, is planned to offer a second way. From the portal you choose **Connect HB Hub**, and the portal can then create and manage your production keys and webhooks for you, so you do not have to copy secrets between sites. The Hub's side of this is built. The portal's side is coming with the developer portal, so you cannot use it yet.
+The HB Developers portal, where the sandbox lives, offers a second way. From the portal you choose **Connect HB Hub**, and the portal can then create and manage your production keys and webhooks for you, so you do not have to copy secrets between sites. If the portal tells you the connection is not set up for it, use the manual way. See [go to production](portal/16-go-to-production.md).
 
 The connection uses OAuth 2, with the Hub as the provider. The steps are as follows:
 

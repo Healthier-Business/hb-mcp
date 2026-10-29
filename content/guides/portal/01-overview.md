@@ -24,7 +24,7 @@ The documentation itself is organised in sections, one for each portal of the Hu
 
 3. **Create a test key and exchange it for a token**
 
-   Test keys start with `hbk_`, exactly like real ones. You trade one for a one hour access token with `POST /api/v2/auth/token`. See [API keys and token exchange](hb://guides/portal-api-keys-and-tokens).
+   Test keys start with `hbk_test_`; live keys start with `hbk_` without `test_`. You trade one for a one hour access token with `POST /api/v2/auth/token`. See [API keys and token exchange](hb://guides/portal-api-keys-and-tokens).
 
 4. **Make your first call**
 
