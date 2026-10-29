@@ -5,6 +5,9 @@ import type { CallArgs } from '../execute.js';
 import { redactor } from '../redact.js';
 import { gate, isWrite } from '../safety.js';
 import { SafetyRefusal } from '../errors.js';
+import { open } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { dirname, isAbsolute } from 'node:path';
 import { textResult, type ToolDefinition, type ToolResult } from './types.js';
 
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -214,4 +217,58 @@ export function missingScopes(ctx: AppContext, ids: string[], run: TaskRun): str
 
 export function readOnlyHints() {
   return { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true } as const;
+}
+
+export function rows(r: CallOutcome): Json[] {
+  return Array.isArray(r.data) ? r.data : [];
+}
+
+export function fail(ctx: AppContext, run: TaskRun, what: string, r: CallOutcome, key?: string): ToolResult {
+  const lines = [`${what}.`, ...(r.error && !r.skipped ? [r.error] : [`Reason: ${why(r)}.`]), ...(key ? [`idempotency_key: ${key}`] : []), `Operations called: ${run.operationsCalled().join(', ')}.`];
+  return taskResult(ctx, run, { lines, data: { executed: false, problem: why(r), idempotency_key: key } }, true);
+}
+
+/** True when the failure left the outcome of a write unknown (no answer or a server error). */
+export function outcomeUnknown(r: CallOutcome): boolean {
+  return (r.status === undefined && /No answer from the Hub/.test(r.error ?? '')) || (r.status ?? 0) >= 500;
+}
+
+/** Show only the end of an identifier: share codes, certificate and document numbers are never echoed in full. */
+export function maskId(v: unknown): string {
+  const s = String(v ?? '').replace(/\s+/g, '');
+  return s.length <= 4 ? '****' : `${'*'.repeat(Math.max(4, s.length - 3))}${s.slice(-3)}`;
+}
+
+/** Register values that must never appear in an answer, a log or an error the Hub echoes. */
+export function protect(...values: unknown[]): void {
+  for (const v of values) if (typeof v === 'string') redactor.add(v);
+}
+
+/** Write a one-time secret to a NEW owner-only file. Returns a problem text, or undefined when saved. */
+export async function saveSecretFile(path: string, secret: string): Promise<string | undefined> {
+  if (!isAbsolute(path)) return 'save_secret_to must be an absolute path.';
+  if (!existsSync(dirname(path))) return 'The folder for save_secret_to does not exist.';
+  try {
+    const f = await open(path, 'wx', 0o600);
+    try {
+      await f.writeFile(secret + '\n');
+    } finally {
+      await f.close();
+    }
+    return undefined;
+  } catch (e) {
+    return (e as NodeJS.ErrnoException).code === 'EEXIST' ? 'save_secret_to already exists; the server never overwrites files.' : 'The secret file could not be written.';
+  }
+}
+
+/** Environment line used at the top of plans and results. */
+export function environmentLine(ctx: AppContext): string {
+  return ctx.config.mode === 'live' ? 'LIVE Hub: real people, real credits and real emails.' : 'SANDBOX: synthetic data; nobody real is contacted.';
+}
+
+/** A sentence that says clearly who will be emailed, and whether they are real. */
+export function emailNote(ctx: AppContext, who: string): string {
+  return ctx.config.mode === 'live'
+    ? `An email WILL be sent to ${who} (a real person on the LIVE Hub).`
+    : `An email will be sent to ${who} (in a sandbox it goes to the sandbox inbox, not to a real person).`;
 }

@@ -1,7 +1,4 @@
 import { randomUUID } from 'node:crypto';
-import { open } from 'node:fs/promises';
-import { dirname, isAbsolute } from 'node:path';
-import { existsSync } from 'node:fs';
 import { z } from 'zod';
 import type { AppContext } from '../context.js';
 import { SafetyRefusal } from '../errors.js';
@@ -9,6 +6,8 @@ import { redactor } from '../redact.js';
 import {
   UUID,
   assertWritable,
+  fail,
+  saveSecretFile,
   day,
   missingScopes,
   money,
@@ -262,11 +261,6 @@ export function bookPracticalTrainingTool(ctx: AppContext): TaskTool {
   };
 }
 
-function fail(ctx: AppContext, run: TaskRun, what: string, r: CallOutcome, key?: string) {
-  const lines = [`${what}.`, ...(r.error && !r.skipped ? [r.error] : [`Reason: ${why(r)}.`]), ...(key ? [`idempotency_key: ${key}`] : []), `Operations called: ${run.operationsCalled().join(', ')}.`];
-  return taskResult(ctx, run, { lines, data: { executed: false, problem: why(r), idempotency_key: key } }, true);
-}
-
 // -------------------------------------------------------------------------------- hb_setup_sandbox_webhook
 
 const DEFAULT_EVENTS = [
@@ -284,22 +278,6 @@ const webhookArgs = z.object({
   events: z.array(z.string()).min(1).optional(),
   save_secret_to: z.string().optional(),
 });
-
-async function saveSecretFile(path: string, secret: string): Promise<string | undefined> {
-  if (!isAbsolute(path)) return 'save_secret_to must be an absolute path.';
-  if (!existsSync(dirname(path))) return 'The folder for save_secret_to does not exist.';
-  try {
-    const f = await open(path, 'wx', 0o600);
-    try {
-      await f.writeFile(secret + '\n');
-    } finally {
-      await f.close();
-    }
-    return undefined;
-  } catch (e) {
-    return (e as NodeJS.ErrnoException).code === 'EEXIST' ? 'save_secret_to already exists; the server never overwrites files.' : 'The secret file could not be written.';
-  }
-}
 
 export function setupSandboxWebhookTool(ctx: AppContext): TaskTool {
   return {

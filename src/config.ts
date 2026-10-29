@@ -9,6 +9,7 @@ export const TOOLSETS = [
 
 export type Mode = 'live' | 'sandbox';
 export type ToolMode = 'compact' | 'full';
+export type TaskToolsMode = 'all' | 'core' | 'none';
 
 export interface Config {
   apiKey: string | undefined;
@@ -16,6 +17,7 @@ export interface Config {
   mode: Mode;
   modeSource: 'HB_ENV' | 'url' | 'default' | 'unrecognised-host';
   toolMode: ToolMode;
+  taskTools: TaskToolsMode;
   toolsets: string[];
   readOnly: boolean;
   allowLiveWrites: boolean;
@@ -51,6 +53,7 @@ const schema = z.object({
   HB_BASE_URL: z.string().optional(),
   HB_ENV: z.enum(['live', 'sandbox']).optional(),
   HB_TOOL_MODE: z.enum(['compact', 'full']).optional(),
+  HB_TASK_TOOLS: z.enum(['all', 'core', 'none']).optional(),
   HB_TOOLSETS: z.string().optional(),
   HB_READ_ONLY: bool('HB_READ_ONLY', true),
   HB_ALLOW_LIVE_WRITES: bool('HB_ALLOW_LIVE_WRITES', false),
@@ -120,6 +123,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     mode,
     modeSource: source,
     toolMode: e.HB_TOOL_MODE ?? 'compact',
+    taskTools: e.HB_TASK_TOOLS ?? 'all',
     toolsets,
     readOnly: e.HB_READ_ONLY,
     allowLiveWrites: e.HB_ALLOW_LIVE_WRITES,
