@@ -248,6 +248,15 @@ With the current API none of these print a deprecation warning, because nothing 
 
 ## Changelog
 
+### Training Verification, October 2026 (additive)
+
+A tenth portal, `training-verification`, is added under `/api/v2` (11 operations, 7 webhook events). The specification now describes 200 operations and 66 webhook events; nothing existing changed and every existing operation id is the same. The portal is described on its [page](../portals/training-verification.md).
+
+* **Endpoints.** `profile.show`, `pricing.show`, `credits.show`, `credits.transactions`, `verifications.create` (`202 Accepted`, `Idempotency-Key`), `verifications.list`, `verifications.show`, `verifications.events`, `verifications.certificate`, `verifications.report`, `verifications.cancel`.
+* **Scopes.** `training-verification:read` and `training-verification:write` (write also grants read), `training-verification:*` for the portal. They are the first scopes without a resource part: `{portal}:{read|write}`.
+* **Webhook events.** `training-verification.submitted`, `.processing`, `.verified`, `.not_found`, `.rejected`, `.failed` and `.refunded`, each at most once per verification. Their `data` carries ids, statuses, a public reason code, timestamps and the candidate name the client supplied.
+* **Payment.** The API charges the client's credits and balances only, by the same rules as the Hub form: a regular account's automated verification is free; manual verification, and every verification of a verification-only account, is charged. A shortfall is `402 insufficient_credits` with `details.required` and `details.available`. There is no card payment through the API.
+
 ### 2.0.0, October 2026
 
 The first release of the v2 API. It is one API for every portal, with one way to sign in, one list format, one error format and one webhook system. The machine-readable specification (`hub-v2.json`, see [SDKs and tools](15-sdk-and-tools.md)) describes it with 163 paths, 186 operations and 59 webhook events.
@@ -271,6 +280,7 @@ The first release of the v2 API. It is one API for every portal, with one way to
 | References | 11 | Reference requests, referees, templates, seven webhook events |
 | Registration Monitoring | 29 | Workers, evidence, verification, alerts, imports, billing, two webhook events |
 | DBS and Right To Work | 32 | The same areas for DBS and right to work checks, with share codes, three webhook events |
+| Training Verification | 11 | Added after 2.0.0 (see the entry above): verifications, results, events, certificate, report, cancel, credits, seven webhook events |
 
 **Conventions** shared by all of the above, as described in these guides: a `{ data }` envelope for single records and `{ data, meta, links }` for lists, `page`, `per_page` (1 to 100, default 25), `sort`, `search` and `{field}_from` and `{field}_to` filters, dates in ISO 8601 UTC with a `Z`, money in integer pence with a `currency`, errors as `{ error, message, details, request_id }` with an `X-Request-Id` header, `Idempotency-Key` on creating calls, hourly rate limits per key with `X-RateLimit-*` headers, scopes of the form `{portal}:{resource}:{read|write}` where a write scope implies the matching read scope, and an optional IP allowlist per key.
 

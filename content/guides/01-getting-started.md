@@ -12,7 +12,7 @@ https://hub.hbcompliance.co.uk/api/v2
 
 The `v2` in the path is the version. Every example in these guides builds its URLs from that base. Only HTTPS is supported, and every answer is JSON, including errors, so you can always parse the body.
 
-One API covers every portal your organisation uses with Healthier Business. A call to Online Training, Occupational Health, Practical Training, Virtual BLS Training, Clinical Interviews, Clinical Appraisals, References, Registration Monitoring or DBS and Right To Work uses the same base URL, the same way of signing in, the same list format and the same error format. There is also a small core API for the Hub itself, which holds your candidates. You will meet it in a moment.
+One API covers every portal your organisation uses with Healthier Business. A call to Online Training, Occupational Health, Practical Training, Virtual BLS Training, Clinical Interviews, Clinical Appraisals, References, Registration Monitoring, DBS and Right To Work or Training Verification uses the same base URL, the same way of signing in, the same list format and the same error format. There is also a small core API for the Hub itself, which holds your candidates. You will meet it in a moment.
 
 ## The Hub model
 

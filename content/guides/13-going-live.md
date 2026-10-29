@@ -51,7 +51,7 @@ Log the `request_id` of every error response (and the `X-Request-Id` header of o
 
 ### 10. Data handling
 
-If the integration touches occupational health, clinical or reference data, check that your handling follows your own data protection rules and that sensitive files and logs are protected. See [health data and privacy](11-health-data-and-privacy.md).
+If the integration touches occupational health, clinical, reference or training certificate data (a Training Verification certificate carries the candidate's name and training record), check that your handling follows your own data protection rules and that sensitive files and logs are protected. See [health data and privacy](11-health-data-and-privacy.md).
 
 ### 11. People and process
 

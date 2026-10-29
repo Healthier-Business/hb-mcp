@@ -60,6 +60,7 @@ Files come from dedicated endpoints that stream the file with a content type suc
 | References | `GET /referees/{uuid}/pdf` | The completed reference as a PDF |
 | Registration Monitoring | `GET /evidence/{file}/download` | An evidence file |
 | Online Training | `GET /candidates/{candidate_ref}/certificate` | A combined certificate PDF |
+| Training Verification | `GET /verifications/{verification}/certificate` and `/report` | The certificate file you submitted, and the verification report PDF (personal data: the candidate's name and training record) |
 | Practical Training and Virtual BLS Training | `GET /bookings/{booking}/certificate` | An attendance or training certificate PDF |
 
 Each portal's page lists the details, and the errors you can get. For example `422 report_not_available` means the report does not exist yet, and `410 report_expired` on an interview report means its retention period has ended. A document that is not yours, or does not exist, is `404`.

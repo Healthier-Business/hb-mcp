@@ -241,9 +241,9 @@ describe('error mapping', () => {
 });
 
 describe('events', () => {
-  it('lists the 59 events, filters by portal, describes one with schema and example', async () => {
+  it('lists the 66 events, filters by portal, describes one with schema and example', async () => {
     const all = await h.call('hb_list_events');
-    expect(all.json.count).toBe(59);
+    expect(all.json.count).toBe(66);
     const oh = await h.call('hb_list_events', { portal: 'occupational-health' });
     expect(oh.json.count).toBeGreaterThan(3);
     const type = oh.json.events[0].type;

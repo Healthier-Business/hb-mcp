@@ -76,6 +76,7 @@ export const TAG_TOOLSETS: Record<string, string> = {
   'Virtual BLS Training': 'virtual-bls-training',
   'Clinical Interviews': 'clinical-interviews',
   'Clinical Appraisals': 'clinical-appraisals',
+  'Training Verification': 'training-verification',
 };
 
 /** Operations the server handles itself; they carry credentials and are never exposed as tools. */

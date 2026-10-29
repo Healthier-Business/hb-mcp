@@ -49,6 +49,6 @@ describe('config', () => {
 
   it('parses toolsets', () => {
     expect(loadConfig(env({ HB_TOOLSETS: 'hub, References' })).toolsets).toEqual(['hub', 'references']);
-    expect(loadConfig(env({ HB_TOOLSETS: 'all' })).toolsets).toHaveLength(12);
+    expect(loadConfig(env({ HB_TOOLSETS: 'all' })).toolsets).toHaveLength(13);
   });
 });

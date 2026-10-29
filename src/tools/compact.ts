@@ -99,7 +99,7 @@ export function buildCompactTools(ctx: AppContext): ToolDefinition[] {
       type: 'object',
       properties: {
         query: { type: 'string', description: 'Words to look for, e.g. "book practical training", "candidate compliance", "webhook".' },
-        toolset: { type: 'string', description: 'Portal: hub, account, online-training, occupational-health, references, practical-training, virtual-bls-training, clinical-interviews, registration-monitoring, dbs-rtw, clinical-appraisals, authentication.' },
+        toolset: { type: 'string', description: 'Portal: hub, account, online-training, occupational-health, references, practical-training, virtual-bls-training, clinical-interviews, registration-monitoring, dbs-rtw, clinical-appraisals, training-verification, authentication.' },
         method: { type: 'string', enum: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] },
         scope: { type: 'string', description: 'Substring of the required scope, e.g. "bookings:write".' },
         writes_only: { type: 'boolean', description: 'Only operations that change data.' },

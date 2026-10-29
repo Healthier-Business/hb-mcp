@@ -43,7 +43,7 @@ Because real events depend on things people do (a candidate finishing a question
 - **API Playground.** Build and send requests from the console, and copy them as code. See [API Playground](portal/12-api-playground.md).
 - **Inbox.** The emails and texts the sandbox would have sent.
 
-If you need an error on demand, use real error cases: a missing scope, a bad body (`422`), an unknown id (`404`), or the rate limit. This guide does not describe any special fault headers or magic values, because the portal guides do not document them.
+If you need an error on demand, use real error cases: a missing scope, a bad body (`422`), an unknown id (`404`), or the rate limit; a charged Training Verification request (for example a manual one) on a wallet with too little credit gives `402 insufficient_credits`, while an automated one on a regular account is free and never fails that way. This guide does not describe any special fault headers or magic values, because the portal guides do not document them.
 
 ## Going from the sandbox to production
 

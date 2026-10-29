@@ -10,7 +10,7 @@ A scope has three parts, separated by colons:
 {portal}:{resource}:{access}
 ```
 
-- The **portal** is the key of a portal: `hub`, `online-training`, `occupational-health`, `practical-training`, `virtual-bls-training`, `clinical-interviews`, `clinical-appraisals`, `references`, `registration-monitoring` or `dbs-rtw`. Webhook management uses the pseudo-portal `account`.
+- The **portal** is the key of a portal: `hub`, `online-training`, `occupational-health`, `practical-training`, `virtual-bls-training`, `clinical-interviews`, `clinical-appraisals`, `references`, `registration-monitoring`, `dbs-rtw` or `training-verification`. Webhook management uses the pseudo-portal `account`.
 - The **resource** is a group of endpoints inside the portal, such as `candidates`, `bookings`, `credits` or `documents`.
 - The **access** is `read` or `write`. Read covers calls that only look at data. Write covers calls that create, change or delete something, or that cause something to happen, such as sending an email.
 
@@ -119,6 +119,14 @@ Whole portal: `occupational-health:*`.
 | `occupational-health:alerts:read` | `occupational-health:alerts:write` | Rejected and not fit alerts |
 | `occupational-health:reports:read` | `occupational-health:reports:write` | Generate and download reports |
 | `occupational-health:credits:read` | none | Credit balance, transactions and top-up packages |
+
+### Training Verification
+
+Whole portal: `training-verification:*`. The portal has only two scopes, with no resource part in the name.
+
+| Read scope | Write scope | What it covers |
+| --- | --- | --- |
+| `training-verification:read` | `training-verification:write` | Read: profile, pricing, credits and ledgers, verifications, their events, the certificate file and the report. Write: request a verification and cancel a pending one (it also grants read) |
 
 ### References
 

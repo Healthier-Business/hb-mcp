@@ -78,6 +78,8 @@ Choose only the events you will act on. Each portal's page in [the portals folde
 
 **References** (`references.`): `reference.request.created`, `reference.submitted`, `reference.declined`, `reference.expired`, `reference.reminder.sent`, `reference.all_completed`, `candidate.referees.submitted`.
 
+**Training Verification** (`training-verification.`): `submitted`, `processing`, `verified`, `not_found`, `rejected`, `failed`, `refunded`. Each fires at most once per verification, whatever the engine retries or staff re-run; see the [Training Verification page](../portals/training-verification.md).
+
 **Registration Monitoring** (`registration-monitoring.`): `worker.status_changed`, `worker.initial_verification`.
 
 **DBS and Right To Work** (`dbs-rtw.`): `dbs.status_changed`, `rtw.status_changed`, `alert.raised`.
@@ -149,7 +151,7 @@ The test event is simpler. It is the only event whose name has no portal prefix:
 
 ### Payloads carry ids and statuses, not personal data
 
-Webhook bodies are deliberately small. They carry identifiers (`candidate_ref`, booking and request ids), statuses and dates. They do not carry names, email addresses, questionnaire answers, review notes or document contents. Where a body has a flag such as `has_review_note`, it tells you that something exists, and you fetch it from the API with a key that has the right scope. This keeps sensitive information off the wire and out of your web server logs, and it means a webhook alone is never enough to expose a person's data. Use the event as a prompt to call the API, for example `GET /hub/candidates/{candidate_ref}`. See [health data and privacy](11-health-data-and-privacy.md).
+Webhook bodies are deliberately small. They carry identifiers (`candidate_ref`, booking and request ids), statuses and dates. They do not carry names (the one exception: the Training Verification events carry the `candidate_name` you entered when you requested the verification), email addresses, questionnaire answers, review notes or document contents. Where a body has a flag such as `has_review_note`, it tells you that something exists, and you fetch it from the API with a key that has the right scope. This keeps sensitive information off the wire and out of your web server logs, and it means a webhook alone is never enough to expose a person's data. Use the event as a prompt to call the API, for example `GET /hub/candidates/{candidate_ref}`. See [health data and privacy](11-health-data-and-privacy.md).
 
 ## Delivery headers
 

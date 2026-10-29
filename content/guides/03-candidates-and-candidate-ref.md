@@ -125,6 +125,7 @@ Every portal takes the reference in one of three ways.
 | Practical Training and Virtual BLS Training | A field of `POST /bookings`, returned on every booking and invitation, and a filter of the booking lists |
 | Clinical Interviews and Clinical Appraisals | A field of `POST /bookings`, returned on every booking and a filter |
 | References | A field of `POST /requests`, returned on every request and a filter |
+| Training Verification | An optional field of `POST /verifications` (validated: it must be your candidate), returned on every verification and a filter. A candidate of another account matched on the certificate is never exposed |
 | Registration Monitoring and DBS and Right To Work | A field of `POST /workers` linking the worker to a Hub candidate, returned on every worker and a filter |
 
 Candidate creation exists only in the Hub core API. A portal never creates a person for you. If you try to book, assign or request for a person who does not exist yet, you first call `POST /hub/candidates`.

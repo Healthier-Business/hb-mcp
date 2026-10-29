@@ -58,6 +58,7 @@ Only the endpoints that create something, or start something that must not happe
 | Clinical Interviews | `POST /clinical-interviews/timeslots/hold`, `POST /clinical-interviews/bookings`, `POST /clinical-interviews/bookings/{id}/reschedule` |
 | Clinical Appraisals | `POST /clinical-appraisals/bookings` |
 | References | `POST /references/requests`, `POST /references/requests/{uuid}/referees` |
+| Training Verification | `POST /training-verification/verifications` (the Hub form's `submission_token`; a late retry after the 24 hours still finds the same verification and never charges twice) |
 | Registration Monitoring | `POST /registration-monitoring/workers`, `POST /registration-monitoring/workers/{worker}/verify`, `POST /registration-monitoring/verify/batch`, `POST /registration-monitoring/worker-imports` |
 | DBS and Right To Work | `POST /dbs-rtw/workers`, `POST /dbs-rtw/workers/{worker}/verify`, `POST /dbs-rtw/verify/batch`, `POST /dbs-rtw/worker-imports` |
 

@@ -30,14 +30,14 @@ Until then, you can give your coding assistant the OpenAPI file described below 
 
 ## The OpenAPI specification
 
-The API is described by an OpenAPI 3.1 document, `hub-v2.json`. It is generated from the code that serves the API, so it describes what the API really does. It covers all of `/api/v2`: 163 paths, 186 operations and the 59 webhook events. For every operation it gives the summary and description, the parameters, the request body and the responses, including the errors.
+The API is described by an OpenAPI 3.1 document, `hub-v2.json`. It is generated from the code that serves the API, so it describes what the API really does. It covers all of `/api/v2`: 176 paths, 200 operations and the 66 webhook events. For every operation it gives the summary and description, the parameters, the request body and the responses, including the errors.
 
 Some features of the document are worth knowing:
 
 - **Servers.** The production server is `https://hub.hbcompliance.co.uk`, and every path in the document starts with `/api/v2`. When a tool asks for a base URL, give it the server address, not the address plus `/api/v2`, or the paths will be wrong. The document also lists a sandbox server whose host is a placeholder, because sandboxes are not open yet (see [testing and sandbox](12-testing-and-sandbox.md)). Change it when they are.
 - **Security.** There is one security scheme, a bearer token, as the document explains. The tools below cannot exchange the key for a token by themselves, so you call `POST /auth/token` yourself, or in your own code, and give the tool the access token. A token lasts 60 minutes.
 - **Scopes.** Each operation names the scope a key needs in an extension field, `x-required-scope`, for example `hub:candidates:read`. The Scopes guide explains the format.
-- **Tags.** Operations are tagged by portal: Authentication, Account, Hub (core), Online Training, Occupational Health, Practical Training, Virtual BLS Training, Clinical Interviews, Clinical Appraisals, References, Registration Monitoring, and DBS and Right To Work.
+- **Tags.** Operations are tagged by portal: Authentication, Account, Hub (core), Online Training, Occupational Health, Practical Training, Virtual BLS Training, Clinical Interviews, Clinical Appraisals, References, Registration Monitoring, DBS and Right To Work, and Training Verification.
 - **Operation ids.** Every operation has a unique `operationId` in dotted form, such as `hub.candidates.list` or `auth.token.create`. Code generators turn these into method names.
 - **Webhooks.** The document has a `webhooks` section, with one entry for each event and the shape of its `data`. Each event is named as in these guides, for example `online-training.course.completed`.
 

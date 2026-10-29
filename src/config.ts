@@ -5,6 +5,7 @@ export const DEFAULT_BASE_URL = 'https://hub.hbcompliance.co.uk';
 export const TOOLSETS = [
   'hub', 'account', 'authentication', 'online-training', 'occupational-health', 'references', 'practical-training',
   'virtual-bls-training', 'clinical-interviews', 'registration-monitoring', 'dbs-rtw', 'clinical-appraisals',
+  'training-verification',
 ] as const;
 
 export type Mode = 'live' | 'sandbox';
