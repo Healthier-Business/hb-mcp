@@ -95,7 +95,9 @@ export function normaliseBaseUrl(raw: string): string {
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
-  const parsed = schema.safeParse(env);
+  // Clients such as Claude Code pass unset optional settings as empty strings: treat those as not set.
+  const present = Object.fromEntries(Object.entries(env).filter(([, value]) => value !== undefined && value.trim() !== ''));
+  const parsed = schema.safeParse(present);
   if (!parsed.success) {
     throw new ConfigError(parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; '));
   }

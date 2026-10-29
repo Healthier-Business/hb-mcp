@@ -32,6 +32,20 @@ claude mcp add hb-hub --scope project \
 
 Then ask Claude to check the connection: "Run hb_status". It tells you whether you are on the sandbox or live, which key it is using and what the key may do.
 
+Or install it as a Claude Code plugin. The plugin adds the server, a safe-workflow skill and the commands `/hub-status` and `/hub-sandbox-test`. Set your key and your sandbox URL in the shell before you start Claude Code, then run:
+
+```sh
+export HB_API_KEY=hbk_test_...
+export HB_BASE_URL=https://YOUR-SANDBOX-URL
+```
+
+```text
+/plugin marketplace add Healthier-Business/hb-mcp
+/plugin install hb-hub@healthier-business
+```
+
+The plugin reads `HB_API_KEY`, `HB_BASE_URL`, `HB_READ_ONLY` and the other variables from your shell. It has no default URL, so it never points at the live Hub by accident.
+
 ### Claude Desktop
 
 Edit `claude_desktop_config.json` (Settings, Developer, Edit Config) and add this block. Desktop has no variable interpolation, so the key sits in that file: use a **sandbox key** here. Restart Claude Desktop.

@@ -5,8 +5,7 @@
       "args": ["-y", "@healthier-business/hub-mcp"],
       "env": {
         "HB_API_KEY": "${HB_API_KEY}",
-        "HB_BASE_URL": "${HB_BASE_URL:-https://hub.hbcompliance.co.uk}",
-        "HB_ENV": "${HB_ENV:-}",
+        "HB_BASE_URL": "${HB_BASE_URL}",
         "HB_TOOL_MODE": "${HB_TOOL_MODE:-compact}",
         "HB_READ_ONLY": "${HB_READ_ONLY:-true}",
         "HB_ALLOW_LIVE_WRITES": "${HB_ALLOW_LIVE_WRITES:-false}",

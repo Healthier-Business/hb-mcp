@@ -14,6 +14,14 @@ describe('config', () => {
     expect(writesEnabled(c)).toBe(false);
   });
 
+  it('treats empty settings as not set, as Claude Code passes unset variables as empty strings', () => {
+    const c = loadConfig(env({ HB_ENV: '', HB_TOOLSETS: '', HB_BASE_URL: '', HB_READ_ONLY: '', HB_API_KEY: '  ' }));
+    expect(c.baseUrl).toBe('https://hub.hbcompliance.co.uk');
+    expect(c.mode).toBe('live');
+    expect(c.readOnly).toBe(true);
+    expect(c.apiKey).toBeUndefined();
+  });
+
   it('detects sandbox from path style and host style URLs, treats unknown hosts as live', () => {
     expect(detectMode('https://dev.example.com/sandbox/8c1f2d3e-0000-4000-8000-000000000000', undefined).mode).toBe('sandbox');
     expect(detectMode('https://abc.sandbox.example.com', undefined).mode).toBe('sandbox');
