@@ -74,7 +74,7 @@ When it works in the sandbox, follow the `go-live-checklist` prompt (or `hb://gu
 
 ## Tools
 
-### Compact mode (default, `HB_TOOL_MODE=compact`): 7 tools
+### Compact mode (default, `HB_TOOL_MODE=compact`): 8 tools
 
 MCP clients degrade or cap beyond about 40 tools, so the default is a handful of meta tools that reach all 189 operations.
 
@@ -87,10 +87,11 @@ MCP clients degrade or cap beyond about 40 tools, so the default is a handful of
 | `hb_list_events` | The 59 webhook events (filter by portal or text). |
 | `hb_describe_event` | One event: payload schema, sample, delivery headers, verification rule. |
 | `hb_verify_webhook_signature` | Local, no network: verify or compute `sha256=` HMAC of `{timestamp}.{body}` with the 300 second window. |
+| `hb_search_guides` | Local, no network, no key needed: keyword search over the 36 bundled guides (15 API, 21 developer portal); returns the best matches with a snippet and the `hb://guides/<name>` to read. Useful for clients that do not browse resources. |
 
 ### Full mode (`HB_TOOL_MODE=full`)
 
-One tool per operation, generated from the bundled spec, named from the operation id (`hub.candidates.list` becomes `hub_candidates_list`), plus `hb_status`, `hb_list_events`, `hb_describe_event` and `hb_verify_webhook_signature`. Path and query parameters are top-level arguments, `body` is the JSON body. Annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`) come from the method and the spec's flags. While `HB_READ_ONLY=true`, write tools are hidden.
+One tool per operation, generated from the bundled spec, named from the operation id (`hub.candidates.list` becomes `hub_candidates_list`), plus `hb_status`, `hb_list_events`, `hb_describe_event`, `hb_verify_webhook_signature` and `hb_search_guides`. Path and query parameters are top-level arguments, `body` is the JSON body. Annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`) come from the method and the spec's flags. While `HB_READ_ONLY=true`, write tools are hidden.
 
 | Toolset (`HB_TOOLSETS`) | Operations | Reads | Writes |
 | --- | --- | --- | --- |
@@ -108,15 +109,43 @@ One tool per operation, generated from the bundled spec, named from the operatio
 | `clinical-appraisals` | 8 | 7 | 1 |
 | **Total** | **189** | **122** | **67** |
 
-Tool counts in full mode: all toolsets with writes on is 186 operation tools + 4 helpers = 190; read-only (default) is 122 read tools + 4 = 126 (`auth.me` is the only authentication tool). Use `HB_TOOLSETS` to stay under your client's limit, for example `HB_TOOLSETS=hub,occupational-health`.
+Tool counts in full mode: all toolsets with writes on is 186 operation tools + 5 helpers = 191; read-only (default) is 122 read tools + 5 = 127 (`auth.me` is the only authentication tool). Use `HB_TOOLSETS` to stay under your client's limit, for example `HB_TOOLSETS=hub,occupational-health`.
 
 The three credential operations (`auth.token.create`, `auth.refresh.create`, `auth.revoke.create`) are never exposed: the server exchanges the key and refreshes tokens itself, so a key or token never passes through a tool call.
 
 ### Resources and prompts
 
-Resources: `hb://guides/<name>` (the 15 developer guides: `authentication`, `errors`, `scopes-and-permissions`, `idempotency`, `webhooks`, `going-live`, ...), `hb://portals/<toolset>`, `hb://spec/overview`, and templates `hb://spec/operations/{id}`, `hb://spec/events/{type}`.
+Resources: `hb://guides/<name>` (the 15 API developer guides and 21 developer portal guides, 36 in all; API guides: `authentication`, `errors`, `scopes-and-permissions`, `idempotency`, `webhooks`, `going-live`, ...), `hb://portals/<toolset>`, `hb://spec/overview`, and templates `hb://spec/operations/{id}`, `hb://spec/events/{type}`.
 
-Prompts: `book-practical-training`, `check-candidate-compliance`, `webhook-sandbox-setup`, `go-live-checklist`, `onboard-candidate`.
+Prompts: `get-started-in-sandbox` (sign up, sandbox, key, `--doctor`, first read), `book-practical-training`, `check-candidate-compliance`, `webhook-sandbox-setup`, `go-live-checklist`, `onboard-candidate`.
+
+### Developer portal guides
+
+The developer portal is where a developer signs up, makes sandboxes, test keys and webhooks, and uses the API Playground. Its 21 usage guides are bundled as resources `hb://guides/portal-<name>` (source files in `content/guides/portal/`), listed after the 15 API guides, so an assistant can explain the portal as well as the API. When no key is configured the server instructions, `hb_status` and the missing-key error point to the first three.
+
+| Resource | What it covers |
+| --- | --- |
+| `hb://guides/portal-overview` | What the Healthier Business developer portal is, what is in it and the shortest path from a new account to a working integration. |
+| `hb://guides/portal-create-your-account` | Sign up for the developer console with your work email address, every field of the form, the rules for passwords and email addresses, and what each error message means. |
+| `hb://guides/portal-verify-your-email` | What the Check your inbox page does, how long the confirmation link lasts, how to get another email and what to do when it does not arrive. |
+| `hb://guides/portal-sign-in-and-security` | Signing in, resetting a forgotten password, turning on two-step sign-in with an authenticator app, recovery codes, and how sessions and lockouts behave. |
+| `hb://guides/portal-the-console-tour` | A walk through the console: the sidebar, the getting started checklist, the account menu, the theme switch, and how it looks on a phone. |
+| `hb://guides/portal-sandboxes` | Create, rename, reset and delete sandboxes, read their addresses and numbers, and understand what a sandbox contains and what it never does. |
+| `hb://guides/portal-api-keys-and-tokens` | Create test keys with the access you need, see a key once, roll and delete it, then exchange it for an access token and refresh it. |
+| `hb://guides/portal-calling-the-api-from-curl-and-postman` | Make your first calls to a sandbox with curl, import the OpenAPI document or Postman collection, and use variables so the same requests work against production later. |
+| `hb://guides/portal-webhooks` | Register an https endpoint in a sandbox, choose events, keep the signing secret, verify every signature, test and simulate events, read the delivery log, and understand retries and automatic switch-off. |
+| `hb://guides/portal-data-page-and-json-viewer` | Look at every table of a sandbox, search and sort it, and open a record as an expandable JSON tree. |
+| `hb://guides/portal-simulate` | Make the things only a person or a clock can do happen inside a sandbox, such as a candidate paying or an interview ending, and see the webhook events, emails and data changes they cause. |
+| `hb://guides/portal-api-playground` | Build and send requests to a sandbox from the console, exchange a key for a token, save requests in collections, use variables, read responses, copy code in four languages and switch to live calls. |
+| `hb://guides/portal-request-log-and-debugging` | Read every call your sandbox answered, filter by method and result, open a call to see both bodies, and work out why a call failed using the error code and request id. |
+| `hb://guides/portal-inbox-and-notifications` | See the emails and texts a sandbox would have sent to candidates, search and filter them, and turn on notifications on your own device. |
+| `hb://guides/portal-support-and-booking-a-call` | Ask the API team a question from the console, read their answers, choose what you need (including a paid technical support call paid with HB Pay), and what to put in a message so it is answered quickly. |
+| `hb://guides/portal-go-to-production` | The checklist for moving an integration from a sandbox to the live HB Hub, doing it by hand or connecting your HB Hub account to manage production keys and webhooks from the console. |
+| `hb://guides/portal-profile-and-security` | Your name, time zone and password, the account security page, downloading your data and deleting your account. |
+| `hb://guides/portal-moving-from-legacy-apis-to-v2` | A step by step migration from the per-service legacy APIs to the single Hub API v2: what changes, how to try it in a sandbox now, and how to switch to live when the Compliance Hub is released. |
+| `hb://guides/portal-reading-the-api-reference` | How the developer site is laid out, how to search it, what is on an endpoint page, how Try it works, and the tools around the reference (Ask AI, Copy for LLM, llms.txt, OpenAPI). |
+| `hb://guides/portal-rate-limits-errors-and-idempotency` | The limits that apply to keys and tokens, every error code and what to do about it, retry rules and how idempotency keys make repeated creates safe. |
+| `hb://guides/portal-faq-and-troubleshooting` | Short answers to the questions developers ask most, grouped by the part of the portal, with where to look when something does not work. |
 
 ## Environment variables
 
@@ -125,7 +154,7 @@ Prompts: `book-practical-training`, `check-candidate-compliance`, `webhook-sandb
 | `HB_API_KEY` | none | The `hbk_` API key. Environment only; never a tool argument. |
 | `HB_BASE_URL` | `https://hub.hbcompliance.co.uk` | **Live** by default. A sandbox looks like `https://<portal host>/sandbox/<uuid>` or `https://<name>.sandbox.<domain>`. `http` is allowed only for localhost. |
 | `HB_ENV` | detected | `live` or `sandbox`: overrides detection. An unrecognised host is treated as **live**. |
-| `HB_TOOL_MODE` | `compact` | `compact` (7 tools) or `full` (one per operation). |
+| `HB_TOOL_MODE` | `compact` | `compact` (8 tools) or `full` (one per operation). |
 | `HB_TOOLSETS` | all | Comma list of portals (full mode, and a limit on `hb_call_operation` too). |
 | `HB_READ_ONLY` | `true` | `false` enables writes. |
 | `HB_ALLOW_LIVE_WRITES` | `false` | Must be `true` (with `HB_READ_ONLY=false`) to write to the live Hub. |

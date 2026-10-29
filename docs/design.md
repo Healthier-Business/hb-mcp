@@ -26,13 +26,14 @@ Package `@healthier-business/hub-mcp`, binary `hb-hub-mcp`. A Model Context Prot
 | `execute.ts` | The one execution pipeline shared by compact and full tools (validate, gate, call, paginate, select, cap, mark). |
 | `output.ts` | `fields` selection, size cap with truncation notice. |
 | `tools/compact.ts`, `tools/full.ts`, `tools/knowledge.ts` | Tool definitions per mode. |
+| `guides.ts` | Load the bundled guides (`content/guides`, then `content/guides/portal`, served as `hb://guides/portal-<name>`) and keyword-search them for `hb_search_guides`. |
 | `resources.ts`, `prompts.ts`, `instructions.ts` | MCP resources, prompts, server instructions. |
 | `server.ts` | Wire a low-level MCP `Server` to the registry. |
 | `http-transport.ts`, `cli.ts`, `doctor.ts` | Streamable HTTP, CLI flags, `--doctor`. |
 
 ## Tool surface
 
-Compact (default, 7 tools): `hb_status`, `hb_search_operations`, `hb_describe_operation`, `hb_call_operation`, `hb_list_events`, `hb_describe_event`, `hb_verify_webhook_signature`. Full: one tool per operation (`hub_candidates_list`, ...) plus the knowledge tools, filtered by `HB_TOOLSETS`, and by `HB_READ_ONLY` (write tools are hidden while read-only).
+Compact (default, 8 tools): `hb_status`, `hb_search_operations`, `hb_describe_operation`, `hb_call_operation`, `hb_list_events`, `hb_describe_event`, `hb_verify_webhook_signature`, `hb_search_guides`. Full: one tool per operation (`hub_candidates_list`, ...) plus the knowledge tools, filtered by `HB_TOOLSETS`, and by `HB_READ_ONLY` (write tools are hidden while read-only).
 
 The three credential operations (`auth.token.create`, `auth.refresh.create`, `auth.revoke.create`) are never exposed as tools: the server does the exchange itself, so a key or token never passes through a tool call. `auth.me.show` is available.
 
@@ -52,3 +53,4 @@ Live is `https://hub.hbcompliance.co.uk` (the default). A sandbox base URL looks
 - Binary responses (PDF, images, CSV) come back as base64 or text within the size cap; files are never written to disk. Uploads use `{filename, content_base64 | content_text, content_type}` for file fields.
 - Superseded tokens stay in the redactor for the life of the process, so a token the Hub echoes back later is still scrubbed.
 - `--http` binds to loopback by default with DNS-rebinding protection; any other host requires `HB_MCP_HTTP_TOKEN`.
+- Developer portal usage guides (21) are converted from the portal's own pages to plain Markdown (no images, steps as numbered lists, callouts as blockquotes) and bundled beside the API guides, so the assistant can guide a human through the console. `hb_search_guides` exists because the other tools only search operations and events; clients that do not browse resources could not otherwise reach the guides. With no key configured, the instructions, `hb_status` and the missing-key error point at the sign-up, sandbox and key guides, and the `get-started-in-sandbox` prompt walks the whole path.
