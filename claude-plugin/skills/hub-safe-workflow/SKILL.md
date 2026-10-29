@@ -10,14 +10,7 @@ The `hb-hub` MCP server talks to the Hub API v2. It is read-only by default and 
 ## Always
 
 1. Call `hb_status` first. State the environment (sandbox or LIVE) and whether writes are enabled.
-2. For the common jobs use the task tools first: they do the job in one call with safe defaults and list the operation ids they used.
-   - `hb_find_candidate`: find a person by name, email or reference.
-   - `hb_candidate_overview`: one line per record across the portals the key can reach (health data only as statuses and dates).
-   - `hb_account_summary`: key, credits and balances, webhook health.
-   - `hb_needs_attention`: what needs action now.
-   - `hb_go_live_check`: readiness report before going live.
-   - `hb_book_practical_training` (writes enabled only): call 1 returns session options and the plan and sends nothing; show them to the user, then call again with the chosen `event_id`, `pay_option`, the agency contact and `confirm: true` only after they say yes.
-   - `hb_setup_sandbox_webhook` (sandbox only, writes enabled): creates an endpoint, sends a test event, reports the delivery. It never returns the signing secret; use `save_secret_to` if the user wants it kept.
+2. For the common jobs use the task tools first: they do the job in one call with safe defaults and list the operation ids they used. Read tools: `hb_find_candidate` (find a person), `hb_candidate_overview` (one line per record across portals; health data only as statuses and dates), `hb_training_progress`, `hb_list_bookings`, `hb_credits`, `hb_account_summary`, `hb_needs_attention`, `hb_monitoring_alerts`, `hb_worker_status`, `hb_billing_summary`, `hb_get_report` (details and how to download, never file bytes), `hb_webhook_health`, `hb_go_live_check`. Write tools (offered only when writes are enabled): `hb_book_practical_training`, `hb_book_slot`, `hb_change_booking`, `hb_invite_to_practical`, `hb_save_candidate`, `hb_assign_training`, `hb_request_references`, `hb_request_occupational_health`, `hb_chase_outstanding`, `hb_verify_worker`, `hb_acknowledge_alerts`, `hb_bulk_import_workers`, `hb_redeliver_webhooks`, `hb_rotate_webhook_secret`, and `hb_setup_sandbox_webhook` (sandbox only). Every write task tool is two calls: the first returns the options or plan (who is emailed, credits, diffs) and sends nothing; show it to the user and call again with `confirm: true` only after they say yes, reusing the `idempotency_key`. Webhook secrets are never returned: offer `save_secret_to` if the user wants one kept. If the server was started with `HB_TASK_TOOLS=core` or `none`, some of these are absent: use the generic tools below.
    For anything else, find operations with `hb_search_operations`, read the exact shape with `hb_describe_operation`, run with `hb_call_operation`.
 3. People are addressed by `candidate_ref` (a uuid). Look the candidate up first; never invent or reuse a ref from a different environment.
 4. Keep answers small: use filters, `per_page`, and the `fields` argument. Use `all_pages` only when you need everything.
