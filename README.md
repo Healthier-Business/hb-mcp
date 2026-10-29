@@ -1,6 +1,6 @@
 # Hub MCP server
 
-`@healthier-business/hub-mcp` is a [Model Context Protocol](https://modelcontextprotocol.io) server for the **Healthier Business Hub API v2**. It lets an AI assistant (Claude Code, Claude Desktop, Cursor, Codex, any MCP client) use every Hub endpoint: 189 operations across the Hub core and ten portals, plus the 59 webhook events as knowledge.
+`@healthier-business/hub-mcp` is a [Model Context Protocol](https://modelcontextprotocol.io) server for the **Healthier Business Hub API v2**. It lets an AI assistant (Claude Code, Claude Desktop, Cursor, Codex, any MCP client) use every Hub endpoint: 200 operations across the Hub core and ten portals, plus the 66 webhook events as knowledge.
 
 It is built to be safe by default:
 
@@ -39,7 +39,7 @@ Or install it as a Claude Code plugin. The plugin adds the server, a safe-workfl
 /plugin install hb-hub@healthier-business
 ```
 
-Claude Code then asks for your sandbox API key (it starts with `hbk_test_` and is kept in your system's secure storage) and your sandbox base URL. Both come from your sandbox in the developer portal. To change them later, run `/plugin configure hb-hub@healthier-business`. The plugin has no default URL, so it never points at the live Hub by accident. `HB_READ_ONLY`, `HB_ALLOW_LIVE_WRITES`, `HB_TOOL_MODE` and `HB_LOG_LEVEL` are read from your shell if you want to change them.
+Claude Code then asks for your sandbox API key (it starts with `hbk_test_` and is kept in your system's secure storage) and your sandbox base URL. Both come from your sandbox in the developer portal. To change them later, run `/plugin configure hb-hub@healthier-business`. The plugin has no default URL, so it never points at the live Hub by accident. `HB_READ_ONLY`, `HB_ALLOW_LIVE_WRITES`, `HB_TOOL_MODE`, `HB_TASK_TOOLS`, `HB_UPLOAD_DIRS` and `HB_LOG_LEVEL` are read from your shell if you want to change them (`HB_UPLOAD_DIRS` is empty by default: only the folder Claude Code was started in is readable by `hb_verify_certificate`).
 
 ### Claude Desktop
 
@@ -112,7 +112,7 @@ When it works in the sandbox, follow the `go-live-checklist` prompt (or `hb://gu
 
 ### Compact mode (default, `HB_TOOL_MODE=compact`): 8 tools plus the task tools
 
-MCP clients degrade or cap beyond about 40 tools, so the default is a handful of meta tools that reach all 189 operations, plus curated task tools for the common jobs (below): 21 tools read-only and 36 with writes enabled (`HB_TASK_TOOLS` changes that).
+MCP clients degrade or cap beyond about 40 tools, so the default is a handful of meta tools that reach all 200 operations, plus curated task tools for the common jobs (below): 22 tools read-only and 38 with writes enabled (`HB_TASK_TOOLS` changes that).
 
 | Tool | What it does |
 | --- | --- |
@@ -120,7 +120,7 @@ MCP clients degrade or cap beyond about 40 tools, so the default is a handful of
 | `hb_search_operations` | Search the operations by text, toolset (portal), method or scope. Says which are callable now and which the key's scopes allow. |
 | `hb_describe_operation` | Full detail: parameters, body schema with required fields and example, scope, credits, health data, errors, idempotency, a ready example call. |
 | `hb_call_operation` | Call any operation by id with `path_params`, `query`, `body`, `headers`. Validates against the spec first, adds `Idempotency-Key`, `all_pages` (capped), `fields` select, `confirm` for live writes. |
-| `hb_list_events` | The 59 webhook events (filter by portal or text). |
+| `hb_list_events` | The 66 webhook events (filter by portal or text). |
 | `hb_describe_event` | One event: payload schema, sample, delivery headers, verification rule. |
 | `hb_verify_webhook_signature` | Local, no network: verify or compute `sha256=` HMAC of `{timestamp}.{body}` with the 300 second window. |
 | `hb_search_guides` | Local, no network, no key needed: keyword search over the 36 bundled guides (15 API, 21 developer portal); returns the best matches with a snippet and the `hb://guides/<name>` to read. Useful for clients that do not browse resources. |
@@ -131,31 +131,32 @@ Task tools do a common job in one call with sensible defaults, so an assistant d
 
 **Every task tool that writes is a two-call flow.** The first call reads only and returns the options or the plan (who will be emailed, what credits or fees apply, a field-by-field diff for updates) and sends nothing. The second call, with `confirm: true` after the user agreed, does it, with idempotency keys (the plan returns the key to reuse). This holds in a sandbox and on live; on live the server must also allow live writes (`HB_READ_ONLY=false` and `HB_ALLOW_LIVE_WRITES=true`). Write task tools are hidden while the server is read-only. Where a Hub call can email a real person, the plan says so.
 
-Read tools (13):
+Read tools (14):
 
 | Tool | What it does |
 | --- | --- |
 | `hb_find_candidate` | Find candidates by name, email, own reference or `candidate_ref`: `candidate_ref`, name, email, roles, status, next expiry and which portals have a record. `hub.candidates.list` / `.show`. |
-| `hb_candidate_overview` | One line per record (status and dates) across online training, practical training, virtual BLS, references, DBS and right to work, registration monitoring, clinical appraisals, clinical interviews and occupational health, for the portals the key can reach. Occupational health is statuses and dates only. |
+| `hb_candidate_overview` | One line per record (status and dates) across online training, practical training, virtual BLS, references, DBS and right to work, registration monitoring, clinical appraisals, clinical interviews, certificate verifications (linked by `candidate_ref`) and occupational health, for the portals the key can reach. Occupational health is statuses and dates only; verifications are status, type, reason code and dates. |
 | `hb_training_progress` | One candidate's online training: summary, courses with grade and dates, modules by status, practical results, one course in full, the assignable catalogue. `online-training.candidates.show/.results/.results.show/.modules/.practical-results`, `.courses.list`. |
 | `hb_list_bookings` | Bookings across practical training (with no-shows), virtual BLS, clinical interviews and clinical appraisals in one table; filter by portal, candidate, dates, status. No contact details. |
-| `hb_credits` | Credits and balances for every portal the key can reach, recent transactions, and the occupational health credit packages. |
+| `hb_credits` | Credits and balances for every portal the key can reach (including Training Verification: money, automated and manual credits, older balance), recent transactions, and the occupational health credit packages. |
 | `hb_account_summary` | The key (name, expiry, scopes), credits and webhook health in one answer. |
-| `hb_needs_attention` | Failed webhooks, unacknowledged alerts, bookings awaiting payment, appraisals awaiting documents, lapsing training, expired reference requests, occupational health counts only. |
+| `hb_needs_attention` | Failed webhooks, unacknowledged alerts, bookings awaiting payment, appraisals awaiting documents, lapsing training, expired reference requests, certificate verifications that failed or sit pending for over an hour, occupational health counts only. |
 | `hb_monitoring_alerts` | Alerts from DBS/RTW, registration monitoring and occupational health with filters; one alert in full. Occupational health alerts are statuses only. |
 | `hb_worker_status` | A DBS/RTW or registration worker: current result, last checks, evidence metadata (type, date, size). Masked certificate numbers only; no date of birth, contact details or files. |
 | `hb_billing_summary` | Usage (trial, billing type, estimate) and bills for DBS/RTW and registration monitoring. |
-| `hb_get_report` | Certificate and report details and exactly how to download them (practical, virtual BLS and online training certificates, interview report, appraisal evaluation report, occupational health reports list). File bytes are never returned. |
+| `hb_get_report` | Certificate and report details and exactly how to download them (practical, virtual BLS and online training certificates, interview report, appraisal evaluation report, occupational health reports list, and the Training Verification report and submitted certificate). File bytes are never returned. |
 | `hb_webhook_health` | Endpoints with active flag and consecutive failures, recent failed deliveries and a response code summary. URLs without query strings. |
-| `hb_go_live_check` | Readiness report: environment, key type, wildcard and expiry warnings, scopes against the `portals` you need, webhooks, the IP allowlist (not visible through the API), remaining steps of the going-live guide. |
+| `hb_go_live_check` | Readiness report: environment, key type, wildcard and expiry warnings, scopes against the `portals` you need (with the Training Verification pricing rules and this account's prices when it is one of them), webhooks, the IP allowlist (not visible through the API), remaining steps of the going-live guide. |
+| `hb_verification_status` | Follow certificate verifications: list (filter by status, request type, `candidate_ref`, `client_reference`, dates) or show one with result records, reason code, charge, the events timeline and whether the report and certificate are available. Metadata only, never the file; email addresses left out. `training-verification.verifications.list` / `.show` / `.events`. |
 
-Write tools (15, two calls each):
+Write tools (16, two calls each):
 
 | Tool | What it does |
 | --- | --- |
 | `hb_book_practical_training` | Options, plan, then hold and book a practical training session; `invite: true` emails an invitation instead. |
 | `hb_book_slot` | Virtual BLS timeslot, clinical interview timeslot or clinical appraisal (param `portal`): options, hold, booking, releases its own hold on rejection. |
-| `hb_change_booking` | Cancel (practical, virtual BLS, interviews) or reschedule (virtual BLS and interviews; the API has no practical reschedule); the plan shows the refund or fee rules and the time window. |
+| `hb_change_booking` | Cancel (practical, virtual BLS, interviews, and `training-verification` verifications, only while pending: the plan shows the refund effect) or reschedule (virtual BLS and interviews; the API has no practical reschedule); the plan shows the refund or fee rules and the time window. |
 | `hb_invite_to_practical` | Practical training booking invitations: create, list (read-only), delete. One-time links are not shown. |
 | `hb_save_candidate` | Create (refuses a duplicate without `allow_duplicate`) or update (field-by-field diff) a candidate. |
 | `hb_assign_training` | Assign online courses without removing existing ones unless named; optional reminder email. |
@@ -167,11 +168,12 @@ Write tools (15, two calls each):
 | `hb_bulk_import_workers` | CSV import into DBS/RTW or registration monitoring: preview first (counts and row errors, no sample rows), then import. |
 | `hb_redeliver_webhooks` | Redeliver failed webhook deliveries (the plan lists them). |
 | `hb_rotate_webhook_secret` | Rotate an endpoint's signing secret. The new secret is never returned: `save_secret_to` writes it to a new owner-only file. The plan warns that receivers fail until updated. |
-| `hb_setup_sandbox_webhook` | Sandbox only: create an endpoint, send a test event, report the delivery. Refuses on live. Same secret handling (`save_secret_to`). Runs in one call. |
+| `hb_setup_sandbox_webhook` | Sandbox only: create an endpoint, send a test event, report the delivery. Refuses on live. Same secret handling (`save_secret_to`). Runs in one call. The default events include the seven `training-verification.*` events when the key has a Training Verification scope. |
+| `hb_verify_certificate` | Verify a training certificate file (PDF, JPG or PNG) on this machine. Call 1 checks the file locally and shows file name, size, type and SHA-256, who gets the result email, the price (Automated is free for regular accounts, charged for verification-only accounts; Manual is always charged; credits or wallet, no card) and the balance, and sends nothing. Call 2 (`confirm: true`) uploads it with `training-verification.verifications.create` (multipart, derived idempotency key) and reports the 202. The file must be inside a folder in `HB_UPLOAD_DIRS`; contents and base64 are never shown. |
 
-Not built as tools: submitting occupational health answers, deleting workers or endpoints, evidence upload, token operations (use `hb_call_operation` where allowed). Right to work document or passport uploads are not supported by `hb_verify_worker` (share codes are).
+Not built as tools: submitting occupational health answers, deleting workers or endpoints, evidence upload, downloading a verification's certificate or report (`hb_get_report` says how), token operations (use `hb_call_operation` where allowed). Right to work document or passport uploads are not supported by `hb_verify_worker` (share codes are).
 
-`HB_TASK_TOOLS` chooses how many task tools are offered: `all` (default, 28), `core` (10: `hb_find_candidate`, `hb_candidate_overview`, `hb_account_summary`, `hb_needs_attention`, `hb_go_live_check`, `hb_book_practical_training`, `hb_setup_sandbox_webhook`, `hb_credits`, `hb_list_bookings`, `hb_webhook_health`) or `none`. Tool counts in compact mode: `all` is 8 + 13 = 21 read-only and 8 + 28 = 36 with writes; `core` is 16 read-only and 18 with writes; `none` is 8. If your client caps tools around 40, `all` fits with writes on but leaves little room for other servers: use `core`.
+`HB_TASK_TOOLS` chooses how many task tools are offered: `all` (default, 30), `core` (11: `hb_find_candidate`, `hb_candidate_overview`, `hb_account_summary`, `hb_needs_attention`, `hb_go_live_check`, `hb_book_practical_training`, `hb_setup_sandbox_webhook`, `hb_credits`, `hb_list_bookings`, `hb_webhook_health`, `hb_verification_status`) or `none`. Tool counts in compact mode: `all` is 8 + 14 = 22 read-only and 8 + 30 = 38 with writes; `core` is 17 read-only and 19 with writes; `none` is 8. If your client caps tools around 40, `all` fits with writes on but leaves little room for other servers: use `core`.
 
 ### Full mode (`HB_TOOL_MODE=full`)
 
@@ -191,9 +193,10 @@ One tool per operation, generated from the bundled spec, named from the operatio
 | `registration-monitoring` | 29 | 17 | 12 |
 | `dbs-rtw` | 32 | 19 | 13 |
 | `clinical-appraisals` | 8 | 7 | 1 |
-| **Total** | **189** | **122** | **67** |
+| `training-verification` | 11 | 9 | 2 |
+| **Total** | **200** | **131** | **69** |
 
-Tool counts in full mode: all toolsets with writes on is 186 operation tools + 5 helpers + 28 task tools = 219; read-only (default) is 122 read tools + 5 + 13 task tools = 140 (`auth.me` is the only authentication tool). With `HB_TASK_TOOLS=core` that is 201 and 135 (writes on, read-only), with `none` 191 and 127. Use `HB_TOOLSETS` to stay under your client's limit, for example `HB_TOOLSETS=hub,occupational-health`.
+Tool counts in full mode: all toolsets with writes on is 197 operation tools + 5 helpers + 30 task tools = 232; read-only (default) is 131 read tools + 5 + 14 task tools = 150 (`auth.me` is the only authentication tool). With `HB_TASK_TOOLS=core` that is 213 and 145 (writes on, read-only), with `none` 202 and 136. Use `HB_TOOLSETS` to stay under your client's limit, for example `HB_TOOLSETS=hub,occupational-health`.
 
 The three credential operations (`auth.token.create`, `auth.refresh.create`, `auth.revoke.create`) are never exposed: the server exchanges the key and refreshes tokens itself, so a key or token never passes through a tool call.
 
@@ -201,7 +204,7 @@ The three credential operations (`auth.token.create`, `auth.refresh.create`, `au
 
 Resources: `hb://guides/<name>` (the 15 API developer guides and 21 developer portal guides, 36 in all; API guides: `authentication`, `errors`, `scopes-and-permissions`, `idempotency`, `webhooks`, `going-live`, ...), `hb://portals/<toolset>`, `hb://spec/overview`, and templates `hb://spec/operations/{id}`, `hb://spec/events/{type}`.
 
-Prompts: `get-started-in-sandbox` (sign up, sandbox, key, `--doctor`, first read), `book-practical-training`, `check-candidate-compliance`, `webhook-sandbox-setup`, `go-live-checklist`, `onboard-candidate`.
+Prompts: `get-started-in-sandbox` (sign up, sandbox, key, `--doctor`, first read), `book-practical-training`, `check-candidate-compliance`, `webhook-sandbox-setup`, `go-live-checklist`, `onboard-candidate`, `verify-a-certificate` (price and balance check, file check, submit, follow the status and the webhook).
 
 ### Developer portal guides
 
@@ -240,13 +243,14 @@ The developer portal is where a developer signs up, makes sandboxes, test keys a
 | `HB_ENV` | detected | `live` or `sandbox`: overrides detection. An unrecognised host is treated as **live**. |
 | `HB_TOOL_MODE` | `compact` | `compact` (8 tools) or `full` (one per operation). |
 | `HB_TOOLSETS` | all | Comma list of portals (full mode, and a limit on `hb_call_operation` too). Task tools whose portals are not listed are hidden. |
-| `HB_TASK_TOOLS` | `all` | `all` (28 task tools), `core` (10) or `none`. Write task tools are hidden while `HB_READ_ONLY=true`. |
+| `HB_TASK_TOOLS` | `all` | `all` (30 task tools), `core` (11) or `none`. Write task tools are hidden while `HB_READ_ONLY=true`. |
 | `HB_READ_ONLY` | `true` | `false` enables writes. |
 | `HB_ALLOW_LIVE_WRITES` | `false` | Must be `true` (with `HB_READ_ONLY=false`) to write to the live Hub. |
 | `HB_LOG_LEVEL` | `warn` | `silent`, `error`, `warn`, `info`, `debug`. Logs go to stderr and hold metadata only. |
 | `HB_MAX_RESPONSE_CHARS` | `60000` | Cap on one tool answer. Larger answers are cut with a notice (lists lose items first). |
 | `HB_REQUEST_TIMEOUT_MS` | `30000` | Per request timeout. |
 | `HB_WEBHOOK_SECRET` | none | Default secret for `hb_verify_webhook_signature`. |
+| `HB_UPLOAD_DIRS` | the server's working directory | Comma-separated **absolute** folders `hb_verify_certificate` may read a certificate from. Anything outside them is refused, including a symbolic link that leads out, hidden files and folders, wildcards, and any type but `.pdf`, `.jpg`, `.jpeg`, `.png`. Unset means the working directory only; the plugin passes it empty. |
 | `HB_MCP_HTTP_TOKEN` | none | Bearer token required by `--http` when not bound to loopback. |
 | `HB_MCP_HTTP_PORT`, `HB_MCP_HTTP_HOST` | `3333`, `127.0.0.1` | Defaults for `--http`. |
 
@@ -268,6 +272,7 @@ CLI: `hb-hub-mcp [--http [--port N] [--host H]] [--doctor] [--version] [--help]`
 | Scope of tokens | One refresher per process (single-flight), the single-use refresh token is replaced the moment a new pair arrives, and the 10 a minute auth throttle and `Retry-After` are respected. |
 | Credentials | Credential endpoints are not tools. |
 | Task tools | Same pipeline as `hb_call_operation`. Tools that write are hidden while read-only and are two calls (plan, then `confirm: true`); `hb_setup_sandbox_webhook` refuses on live; secrets they create are never returned. |
+| Local files | `hb_verify_certificate` is the only tool that reads a file from disk: one absolute path, inside `HB_UPLOAD_DIRS` (default the working directory), after resolving symbolic links, not hidden, an accepted type whose first bytes match, within the API's size limit. A certificate is personal data: its contents and base64 are never shown, logged or returned (the base64 is also registered with the redactor while it is in flight). |
 
 Money is integer pence with a currency; credits are units. The tool descriptions say which operations use credits.
 

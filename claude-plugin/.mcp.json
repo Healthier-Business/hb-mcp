@@ -8,6 +8,7 @@
         "HB_BASE_URL": "${user_config.base_url}",
         "HB_TOOL_MODE": "${HB_TOOL_MODE:-compact}",
         "HB_TASK_TOOLS": "${HB_TASK_TOOLS:-all}",
+        "HB_UPLOAD_DIRS": "${HB_UPLOAD_DIRS:-}",
         "HB_READ_ONLY": "${HB_READ_ONLY:-true}",
         "HB_ALLOW_LIVE_WRITES": "${HB_ALLOW_LIVE_WRITES:-false}",
         "HB_LOG_LEVEL": "${HB_LOG_LEVEL:-warn}"

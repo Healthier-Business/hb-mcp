@@ -27,7 +27,7 @@ Claude Code asks for your sandbox API key (it starts with `hbk_test_`) and your 
 
 ## Settings
 
-`HB_READ_ONLY` (default `true`), `HB_ALLOW_LIVE_WRITES` (default `false`), `HB_TOOL_MODE` (default `compact`), `HB_TASK_TOOLS` (default `all`; `core` or `none` to offer fewer task tools) and `HB_LOG_LEVEL` (default `warn`) are read from your shell environment if you set them. Everything else is in the [server documentation](https://github.com/Healthier-Business/hb-mcp#readme).
+`HB_READ_ONLY` (default `true`), `HB_ALLOW_LIVE_WRITES` (default `false`), `HB_TOOL_MODE` (default `compact`), `HB_TASK_TOOLS` (default `all`; `core` or `none` to offer fewer task tools), `HB_UPLOAD_DIRS` (default empty: `hb_verify_certificate` may then read certificate files only from the folder Claude Code was started in; set a comma-separated list of absolute folders to allow others) and `HB_LOG_LEVEL` (default `warn`) are read from your shell environment if you set them. Everything else is in the [server documentation](https://github.com/Healthier-Business/hb-mcp#readme).
 
 ## Licence
 
