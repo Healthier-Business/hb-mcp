@@ -4,14 +4,14 @@ This plugin lets Claude use the Healthier Business Hub API v2: look up candidate
 
 ## What it contains
 
-- **An MCP server**, `hb-hub`, started with `npx` from the public npm package [`@healthier-business/hub-mcp`](https://www.npmjs.com/package/@healthier-business/hub-mcp). The package is pinned to one exact version in `.mcp.json`. The source is public at [github.com/Healthier-Business/hb-mcp](https://github.com/Healthier-Business/hb-mcp).
+- **An MCP server**, `hb-hub`, started with `npx` from the public npm package [`@healthier-business/hub-mcp`](https://www.npmjs.com/package/@healthier-business/hub-mcp). It runs the latest published version (`npx -y`). The source is public at [github.com/Healthier-Business/hb-mcp](https://github.com/Healthier-Business/hb-mcp).
 - **Skills**: `hub-safe-workflow` (how Claude should use the Hub tools safely, preferring the task tools such as `hb_find_candidate` and `hb_candidate_overview` for common jobs), `/hb-hub:status` (which environment, key and scopes are in use) and `/hb-hub:sandbox-test` (try a workflow in a sandbox before going live).
 
 ## What it does with your data
 
 - It sends requests only to the Hub base URL you enter when you install the plugin. It makes no other network calls and has no analytics or telemetry.
 - Your API key is kept in your system's secure storage. It is never shown to Claude and never written to a log.
-- Answers from the Hub, which can contain personal data about candidates, are returned to Claude in your session. The plugin stores nothing on its own.
+- Answers from the Hub, which can contain personal data about candidates, are returned to Claude in your session. The plugin stores nothing on its own, except that if you ask the sandbox webhook tool to save a new webhook signing secret to a file, it writes that one file to the path you give.
 - Writes are off by default. Writing to the live Hub needs two explicit settings and a confirmation for every write.
 
 ## Install
