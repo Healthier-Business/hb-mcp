@@ -1,0 +1,33 @@
+{
+  "name": "@healthier-business/hub-mcp",
+  "version": "0.1.0",
+  "description": "Model Context Protocol server for the Healthier Business Hub API v2: lets AI assistants use every Hub endpoint safely (read-only by default, sandbox first).",
+  "type": "module",
+  "license": "UNLICENSED",
+  "private": false,
+  "bin": { "hb-hub-mcp": "dist/cli.js" },
+  "main": "dist/index.js",
+  "files": ["dist", "generated", "content", "README.md", "claude-plugin"],
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "generate": "tsx scripts/generate.ts",
+    "spec:refresh": "tsx scripts/spec-refresh.ts",
+    "build": "npm run generate && tsc -p tsconfig.build.json && node scripts/postbuild.mjs",
+    "typecheck": "tsc --noEmit",
+    "lint": "node scripts/lint.mjs",
+    "test": "vitest run",
+    "dev": "tsx src/cli.ts",
+    "doctor": "tsx src/cli.ts --doctor",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "zod": "4.6.6"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "tsx": "4.23.14",
+    "typescript": "5.9.3",
+    "vitest": "5.0.3"
+  }
+}
