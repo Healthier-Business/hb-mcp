@@ -1,5 +1,6 @@
 {
   "name": "healthier-business",
+  "description": "Healthier Business developer tools for Claude Code.",
   "owner": { "name": "Healthier Business" },
   "plugins": [
     {
