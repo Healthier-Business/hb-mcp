@@ -9,7 +9,7 @@ It is built to be safe by default:
 - **Live writes are a two-step**: the first call returns a plan and sends nothing; the second needs `confirm: true`.
 - **Keys never reach the model or a log.** The API key comes only from the environment.
 
-Package name, bin and version: `@healthier-business/hub-mcp`, `hb-hub-mcp`, `0.1.0`. Not published yet (see "Publishing" below).
+Package: `@healthier-business/hub-mcp`. Command: `hb-hub-mcp`. Needs Node 20 or newer.
 
 ## Quickstart (sandbox first)
 
@@ -30,28 +30,55 @@ claude mcp add hb-hub --scope project \
   -- npx -y @healthier-business/hub-mcp
 ```
 
-Or install the plugin (adds the server, a safe-workflow skill and `/hub-status`, `/hub-sandbox-test`) from a clone of this repo:
-
-```sh
-claude plugin marketplace add /path/to/hb-mcp
-claude plugin install hb-hub@healthier-business
-```
-
-The plugin reads `HB_API_KEY`, `HB_BASE_URL`, `HB_READ_ONLY` and the other variables from your shell (`claude-plugin/.mcp.json`). Then ask Claude to run `/hub-status`.
+Then ask Claude to check the connection: "Run hb_status". It tells you whether you are on the sandbox or live, which key it is using and what the key may do.
 
 ### Claude Desktop
 
-Edit `claude_desktop_config.json` (Settings, Developer, Edit Config) and add the block from [`examples/claude-desktop-config.json`](examples/claude-desktop-config.json). Desktop has no variable interpolation, so the key sits in that file: use a **sandbox key** here. Restart Claude Desktop.
+Edit `claude_desktop_config.json` (Settings, Developer, Edit Config) and add this block. Desktop has no variable interpolation, so the key sits in that file: use a **sandbox key** here. Restart Claude Desktop.
+
+```json
+{
+  "mcpServers": {
+    "hb-hub": {
+      "command": "npx",
+      "args": ["-y", "@healthier-business/hub-mcp"],
+      "env": {
+        "HB_API_KEY": "hbk_test_PASTE_YOUR_SANDBOX_KEY_HERE",
+        "HB_BASE_URL": "https://YOUR-SANDBOX-URL",
+        "HB_READ_ONLY": "true"
+      }
+    }
+  }
+}
+```
 
 ### Cursor
 
-Project: copy [`.cursor/mcp.json`](.cursor/mcp.json) (it reads `HB_API_KEY` and `HB_BASE_URL` from your environment with `${env:...}`). Global: `~/.cursor/mcp.json`. One-click install link (fills in placeholders you must replace afterwards in Settings, MCP):
+Project: save this as `.cursor/mcp.json` (it reads `HB_API_KEY` and `HB_BASE_URL` from your environment with `${env:...}`). Global: `~/.cursor/mcp.json`.
+
+```json
+{
+  "mcpServers": {
+    "hb-hub": {
+      "command": "npx",
+      "args": ["-y", "@healthier-business/hub-mcp"],
+      "env": {
+        "HB_API_KEY": "${env:HB_API_KEY}",
+        "HB_BASE_URL": "${env:HB_BASE_URL}",
+        "HB_READ_ONLY": "true"
+      }
+    }
+  }
+}
+```
+
+One-click install link (fills in placeholders you must replace afterwards in Settings, MCP):
 
 `cursor://anysphere.cursor-deeplink/mcp/install?name=hb-hub&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkBoZWFsdGhpZXItYnVzaW5lc3MvaHViLW1jcCJdLCJlbnYiOnsiSEJfQVBJX0tFWSI6IllPVVJfU0FOREJPWF9LRVkiLCJIQl9CQVNFX1VSTCI6Imh0dHBzOi8vWU9VUi1TQU5EQk9YLVVSTCJ9fQ%3D%3D`
 
 ### Codex
 
-Add [`examples/codex-config.toml`](examples/codex-config.toml) to `~/.codex/config.toml`:
+Add this to `~/.codex/config.toml`:
 
 ```toml
 [mcp_servers.hb-hub]
@@ -205,23 +232,3 @@ With the default **stdio** transport the server runs on the developer's own mach
 | "read-only" refusals | By design. Enable in a sandbox with `HB_READ_ONLY=false`; live also needs `HB_ALLOW_LIVE_WRITES=true`. |
 | Too many tools in the client | Use compact mode (default) or `HB_TOOLSETS`. |
 | Answer cut off | Use `fields`, narrower filters or a smaller `per_page`; or raise `HB_MAX_RESPONSE_CHARS`. |
-
-## Development
-
-```sh
-npm install
-npm run generate                      # spec/hub-v2.json -> generated/ (catalogue + events)
-npm run build                         # generate + tsc to dist/
-npm test                              # vitest; mock Hub built from the spec, no real network
-npm run typecheck && npm run lint
-npx tsx scripts/demo-transcript.ts    # built server over stdio with a real MCP client against the mock Hub
-npm run spec:refresh -- /path/to/hub-v2.json [guides-dir portals-dir]
-```
-
-The tool catalogue is built from the bundled spec at build time and a test fails if `generated/` and `spec/hub-v2.json` disagree. To take a new Hub spec: `npm run spec:refresh -- <path>`, `npm test`, commit.
-
-Layout: `src/` (config, catalogue, http, tokens, safety, errors, execute, output, tools, resources, prompts, server, cli), `spec/`, `generated/`, `content/` (bundled guides and portal docs), `claude-plugin/`, `examples/`, `test/`, `docs/design.md`.
-
-## Publishing
-
-Not published. Before publishing: confirm the npm scope (`@healthier-business` must be an npm org the team controls, otherwise rename in `package.json`, the configs and this README), run `npm run build && npm test`, then `npm publish --access public`. `npm pack --dry-run` shows what ships (`dist`, `generated`, `content`, the plugin).
