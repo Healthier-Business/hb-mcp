@@ -38,6 +38,7 @@ export function buildPrompts(ctx: AppContext): PromptDefinition[] {
       build: (a) =>
         [
           `Book a practical training for: ${a.candidate}${a.course ? `, course: ${a.course}` : ''}${a.dates ? `, dates: ${a.dates}` : ''}. Environment: ${env}. ${writeLine}`,
+          'Prefer the task tools: hb_find_candidate to find the person, then hb_book_practical_training (call 1 returns session options and the plan and sends nothing; call 2 with event_id, pay_option, the agency contact and confirm=true books). The generic steps below are the fallback.',
           '1. hb_status (or the status tool) to confirm environment and that the key has practical-training:bookings:write and hub:candidates:read.',
           `2. Find the candidate with ${call('hub.candidates.list')} using query {"search": "..."}; take their candidate_ref. If several match, ask the user which one. Never guess a candidate_ref.`,
           `3. ${call('practical-training.courses.list')} to find the course; ${call('practical-training.events.list')} with available_only=true and a date range to find sessions with free places; ${call('practical-training.locations.list')} if location matters.`,
@@ -55,6 +56,7 @@ export function buildPrompts(ctx: AppContext): PromptDefinition[] {
       build: (a) =>
         [
           `Check the compliance picture for: ${a.candidate}. Environment: ${env}. This is read-only; do not write anything.`,
+          'Prefer the task tools: hb_find_candidate, then hb_candidate_overview (one line per record across the portals the key can reach). The steps below are the fallback.',
           `1. Find them: ${call('hub.candidates.list')} with {"search": "..."}; confirm the right person if several match.`,
           `2. ${call('hub.candidates.show')} with path_params {"candidate_ref": "..."}: compliance_status, next_expiry_date, roles.`,
           `3. If the key has the scopes, also: ${call('occupational-health.candidates.show')} (health clearance; marked health_data, use only what is needed) and ${call('online-training.candidates.results')} (course results) and ${call('online-training.candidates.modules')}.`,
@@ -77,6 +79,7 @@ export function buildPrompts(ctx: AppContext): PromptDefinition[] {
             ? 'WARNING: this server points at the LIVE Hub. Registering a webhook there is a real change. Recommend a sandbox (HB_BASE_URL) first, and only continue on live if the user explicitly asks.'
             : 'This is a sandbox: safe to experiment.',
           writeLine,
+          'Prefer hb_setup_sandbox_webhook (sandbox only): it creates the endpoint, sends a test event and reports the delivery without showing the signing secret. The steps below are the fallback.',
           `1. Choose events: ${compact ? 'hb_list_events and hb_describe_event' : 'the hb_list_events and hb_describe_event tools'}; also ${call('webhooks.events.list')} for the events your key can receive.`,
           `2. Create the endpoint with ${call('webhooks.endpoints.create')} (describe it first). The signing secret is shown ONCE in the answer: tell the user to store it as HB_WEBHOOK_SECRET in their own environment; do not repeat it in chat.`,
           `3. Send a test event: ${call('webhooks.endpoints.test')}; then ${call('webhooks.deliveries.list')} to see the result and status codes.`,
@@ -110,7 +113,7 @@ export function buildPrompts(ctx: AppContext): PromptDefinition[] {
       build: () =>
         [
           `Walk the user through going live. Current environment: ${env} (${ctx.config.baseUrl}).`,
-          'Read hb://guides/going-live and hb://guides/testing-and-sandbox first. Then check, one item at a time, and report pass/fail:',
+          'Run hb_go_live_check first (pass the portals the integration needs): it reports environment, scopes, webhooks and the remaining steps. Read hb://guides/going-live and hb://guides/testing-and-sandbox. Then check, one item at a time, and report pass/fail:',
           '1. Everything worked in a sandbox: list the flows tested and the error cases (402, 403, 404, 409, 422, 429) handled.',
           '2. A new LIVE key exists with only the scopes the integration needs (least privilege), and an IP allowlist if appropriate. With the stdio transport the calls leave from the developer\'s own machine, so that machine\'s public IP is what the allowlist sees.',
           '3. Switch the server: HB_BASE_URL (or remove it for the default https://hub.hbcompliance.co.uk), HB_API_KEY = the live key, restart the client. Keep HB_READ_ONLY=true until the owner is ready; live writes also need HB_ALLOW_LIVE_WRITES=true and confirm=true per write.',

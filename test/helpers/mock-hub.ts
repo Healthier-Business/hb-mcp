@@ -80,7 +80,17 @@ for (const [path, item] of Object.entries<J>(spec.paths)) {
   }
 }
 // Literal paths first so /bookings/no-shows beats /bookings/{booking}.
-routes.sort((a, b) => a.path.replace(/\{[^}]+\}/g, '~').localeCompare(b.path.replace(/\{[^}]+\}/g, '~')));
+routes.sort((a, b) => {
+  const x = a.path.split('/');
+  const y = b.path.split('/');
+  for (let i = 0; i < Math.min(x.length, y.length); i++) {
+    const px = x[i]!.startsWith('{');
+    const py = y[i]!.startsWith('{');
+    if (px !== py) return px ? 1 : -1;
+    if (!px && x[i] !== y[i]) return x[i]!.localeCompare(y[i]!);
+  }
+  return x.length - y.length;
+});
 
 export class MockHub {
   server!: Server;

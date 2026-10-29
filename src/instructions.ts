@@ -13,6 +13,8 @@ export function buildInstructions(config: Config, opCount: number, eventCount: n
     config.toolMode === 'compact'
       ? `Workflow: hb_status first; then hb_search_operations to find an operation, hb_describe_operation to read its exact shape, hb_call_operation to run it. hb_list_events / hb_describe_event explain the ${eventCount} webhook events; hb_verify_webhook_signature checks a delivery locally.`
       : `Each Hub operation is its own tool (name = operation id with underscores, e.g. hub_candidates_list). hb_status shows who you are; hb_list_events / hb_describe_event explain the ${eventCount} webhook events.`;
+  const tasks =
+    'Task tools do the common jobs in one call with sensible defaults, through the same safety pipeline (read-only default, plan-then-confirm, idempotency, secret redaction); prefer them when they match, and each result lists the operation ids it called: hb_find_candidate (find a person by name, email or reference), hb_candidate_overview (one line per record across the portals the key can reach; health data only as statuses and dates), hb_account_summary (credits, key, webhook health), hb_needs_attention (what needs action now), hb_go_live_check (readiness report), and, only when writes are enabled, hb_book_practical_training (call 1 returns options and the plan and sends nothing; call 2 with confirm=true books) and hb_setup_sandbox_webhook (sandbox only; never returns the signing secret). Use the generic tools below for everything else.';
   const noBaseUrl =
     !config.apiKey && config.modeSource === 'default'
       ? 'No sandbox base URL (HB_BASE_URL) is set, so this server points at the default LIVE Hub. Someone building or learning should use a sandbox: hb://guides/portal-sandboxes shows how to create one and where its base address is.'
@@ -24,6 +26,7 @@ export function buildInstructions(config: Config, opCount: number, eventCount: n
     ...(setup ? [setup] : []),
     ...(noBaseUrl ? [noBaseUrl] : []),
     `Healthier Business Hub API v2 (${opCount} operations). Environment: ${env}. ${writes}`,
+    tasks,
     how,
     'People are addressed only by candidate_ref (a uuid); never by internal id, and never invent one: list or search candidates first. A candidate reference of the client\'s own (candidate_reference) is different from candidate_ref.',
     'Scopes: each operation needs a scope like occupational-health:requests:read (a :write scope also grants :read). 403 insufficient_scope means the key lacks it; tell the user which scope to add. Do not try other endpoints to work around it.',

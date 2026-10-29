@@ -5,7 +5,7 @@ import type { HubClient } from './http.js';
 import type { TokenManager } from './tokens.js';
 
 export const SERVER_NAME = 'hb-hub-mcp';
-export const SERVER_VERSION = '0.1.3';
+export const SERVER_VERSION = '0.2.0';
 
 /** Everything a tool needs. One per process; shared by every MCP session. */
 export interface AppContext {
@@ -16,11 +16,13 @@ export interface AppContext {
   executor: Executor;
   /** Scopes of the key, learnt from /auth/me (hb_status). Undefined until known. */
   keyScopes?: string[];
+  /** Pause between polls (task tools); replaced in tests. */
+  sleep: (ms: number) => Promise<void>;
 }
 
 export function scopeAllowed(scopes: string[] | undefined, needed: string | null): boolean | null {
   if (needed === null) return true;
   if (!scopes) return null;
-  if (scopes.includes(needed)) return true;
+  if (scopes.includes(needed) || scopes.includes('*') || scopes.includes(`${needed.split(':')[0]}:*`)) return true;
   return needed.endsWith(':read') && scopes.includes(needed.replace(/:read$/, ':write'));
 }

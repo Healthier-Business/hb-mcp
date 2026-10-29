@@ -24,6 +24,7 @@ import { ResourceRegistry } from './resources.js';
 import { TokenManager } from './tokens.js';
 import { buildCompactTools } from './tools/compact.js';
 import { buildFullTools } from './tools/full.js';
+import { buildTaskTools } from './tools/tasks.js';
 import { textResult, type ToolDefinition } from './tools/types.js';
 
 export interface ContextOverrides {
@@ -39,11 +40,12 @@ export function createContext(config: Config, overrides: ContextOverrides = {}):
   const tokens = new TokenManager({ apiKey: config.apiKey, baseUrl: config.baseUrl, timeoutMs: config.requestTimeoutMs, fetchImpl: overrides.fetchImpl });
   const client = new HubClient({ baseUrl: config.baseUrl, timeoutMs: config.requestTimeoutMs, tokens, fetchImpl: overrides.fetchImpl, sleep: overrides.sleep });
   const executor = new Executor(config, catalogue, client);
-  return { config, catalogue, tokens, client, executor };
+  return { config, catalogue, tokens, client, executor, sleep: overrides.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms))) };
 }
 
 export function buildTools(ctx: AppContext): ToolDefinition[] {
-  return ctx.config.toolMode === 'full' ? buildFullTools(ctx) : buildCompactTools(ctx);
+  const generic = ctx.config.toolMode === 'full' ? buildFullTools(ctx) : buildCompactTools(ctx);
+  return [...generic, ...buildTaskTools(ctx)];
 }
 
 /** One MCP server instance (one per transport session) over the shared app context. */

@@ -13,7 +13,7 @@ export interface Harness {
   client: Client;
   config: Config;
   logs: string[];
-  call: (name: string, args?: Record<string, unknown>) => Promise<{ text: string; isError: boolean; json: any }>;
+  call: (name: string, args?: Record<string, unknown>) => Promise<{ text: string; isError: boolean; json: any; parts: string[]; data: any }>;
   close: () => Promise<void>;
 }
 
@@ -36,10 +36,13 @@ export async function startHarness(env: Record<string, string> = {}, hub?: MockH
     logs,
     async call(name, args = {}) {
       const r = await client.callTool({ name, arguments: args });
-      const text = (r.content as { type: string; text: string }[]).map((c) => c.text).join('\n');
+      const parts = (r.content as { type: string; text: string }[]).map((c) => c.text);
+      const text = parts.join('\n');
       let json: any;
       try { json = JSON.parse(text); } catch { json = undefined; }
-      return { text, isError: r.isError === true, json };
+      let data: any;
+      try { data = parts.length > 1 ? JSON.parse(parts[parts.length - 1] as string) : undefined; } catch { data = undefined; }
+      return { text, isError: r.isError === true, json, parts, data };
     },
     async close() {
       await client.close();

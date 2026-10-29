@@ -14,7 +14,7 @@ describe('full mode', () => {
     const { tools } = await h.client.listTools();
     const names = tools.map((t) => t.name);
     const gets = h.ctx.catalogue.operations.filter((o) => o.method === 'GET' && !o.internal);
-    expect(names).toHaveLength(gets.length + 5);
+    expect(names).toHaveLength(gets.length + 5 + 5);
     expect(names).toContain('hub_candidates_list');
     expect(names).not.toContain('hub_candidates_create');
     expect(names).not.toContain('auth_token_create');
@@ -29,6 +29,7 @@ describe('full mode', () => {
     h = await startHarness({ HB_TOOL_MODE: 'full', HB_READ_ONLY: 'false' });
     const { tools } = await h.client.listTools();
     expect(tools.filter((t) => h!.ctx.catalogue.get(t.name))).toHaveLength(186);
+    expect(tools).toHaveLength(186 + 5 + 7);
     const by = Object.fromEntries(tools.map((t) => [t.name, t]));
     expect(by.hub_candidates_create!.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false, idempotentHint: true });
     expect(by.webhooks_endpoints_delete!.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: true, idempotentHint: true });
