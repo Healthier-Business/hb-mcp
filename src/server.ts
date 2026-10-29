@@ -24,7 +24,7 @@ import { ResourceRegistry } from './resources.js';
 import { TokenManager } from './tokens.js';
 import { buildCompactTools } from './tools/compact.js';
 import { buildFullTools } from './tools/full.js';
-import { buildTaskTools } from './tools/tasks.js';
+import { buildTaskTools, TASK_TOOL_NAMES } from './tools/tasks.js';
 import { textResult, type ToolDefinition } from './tools/types.js';
 
 export interface ContextOverrides {
@@ -59,7 +59,7 @@ export function createMcpServer(ctx: AppContext): Server {
     { name: SERVER_NAME, version: SERVER_VERSION },
     {
       capabilities: { tools: { listChanged: false }, resources: {}, prompts: {} },
-      instructions: buildInstructions(ctx.config, ctx.catalogue.operations.length, ctx.catalogue.events.length),
+      instructions: buildInstructions(ctx.config, ctx.catalogue.operations.length, ctx.catalogue.events.length, tools.map((t) => t.name).filter((n) => (TASK_TOOL_NAMES as readonly string[]).includes(n))),
     },
   );
 

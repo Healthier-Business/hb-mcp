@@ -2,7 +2,38 @@ import type { Config } from './config.js';
 import { writesEnabled } from './config.js';
 
 /** Short guide the model reads at connect time. */
-export function buildInstructions(config: Config, opCount: number, eventCount: number): string {
+const TASK_JOBS: [string, string][] = [
+  ['hb_find_candidate', 'find a person by name, email or reference'],
+  ['hb_candidate_overview', 'one line per record across the portals the key can reach; health data only as statuses and dates'],
+  ['hb_training_progress', "a candidate's online training"],
+  ['hb_list_bookings', 'bookings across the booking portals'],
+  ['hb_credits', 'credit balances and recent transactions'],
+  ['hb_account_summary', 'key, credits and webhook health in one answer'],
+  ['hb_needs_attention', 'what needs action now'],
+  ['hb_monitoring_alerts', 'DBS/RTW, registration and occupational health alerts'],
+  ['hb_worker_status', 'a monitored worker and the latest check'],
+  ['hb_billing_summary', 'monitoring usage and bills'],
+  ['hb_get_report', 'certificate and report details and how to download them'],
+  ['hb_webhook_health', 'failing webhook endpoints and deliveries'],
+  ['hb_go_live_check', 'readiness report before going live'],
+  ['hb_book_practical_training', 'book or invite for practical training'],
+  ['hb_book_slot', 'book a virtual BLS slot, clinical interview or appraisal'],
+  ['hb_change_booking', 'cancel or reschedule a booking'],
+  ['hb_invite_to_practical', 'practical training invitations'],
+  ['hb_save_candidate', 'create or update a candidate without duplicates'],
+  ['hb_assign_training', 'assign online courses'],
+  ['hb_request_references', 'ask for references'],
+  ['hb_request_occupational_health', 'request occupational health clearance (no health answers handled)'],
+  ['hb_chase_outstanding', 'send reminders and extend or cancel reference requests'],
+  ['hb_verify_worker', 'add and verify a DBS/RTW or registration worker'],
+  ['hb_acknowledge_alerts', 'acknowledge or dismiss alerts'],
+  ['hb_bulk_import_workers', 'import workers from a CSV (preview first)'],
+  ['hb_setup_sandbox_webhook', 'create a sandbox webhook, test it (never shows the secret)'],
+  ['hb_redeliver_webhooks', 'redeliver failed webhooks'],
+  ['hb_rotate_webhook_secret', 'rotate a webhook secret (never shows it)'],
+];
+
+export function buildInstructions(config: Config, opCount: number, eventCount: number, taskToolNames: string[] = []): string {
   const env = config.mode === 'live' ? 'LIVE (real people, real data, real credits)' : 'SANDBOX (synthetic data; nothing real is touched)';
   const writes = writesEnabled(config)
     ? config.mode === 'live'
@@ -13,8 +44,11 @@ export function buildInstructions(config: Config, opCount: number, eventCount: n
     config.toolMode === 'compact'
       ? `Workflow: hb_status first; then hb_search_operations to find an operation, hb_describe_operation to read its exact shape, hb_call_operation to run it. hb_list_events / hb_describe_event explain the ${eventCount} webhook events; hb_verify_webhook_signature checks a delivery locally.`
       : `Each Hub operation is its own tool (name = operation id with underscores, e.g. hub_candidates_list). hb_status shows who you are; hb_list_events / hb_describe_event explain the ${eventCount} webhook events.`;
-  const tasks =
-    'Task tools do the common jobs in one call with sensible defaults, through the same safety pipeline (read-only default, plan-then-confirm, idempotency, secret redaction); prefer them when they match, and each result lists the operation ids it called: hb_find_candidate (find a person by name, email or reference), hb_candidate_overview (one line per record across the portals the key can reach; health data only as statuses and dates), hb_account_summary (credits, key, webhook health), hb_needs_attention (what needs action now), hb_go_live_check (readiness report), and, only when writes are enabled, hb_book_practical_training (call 1 returns options and the plan and sends nothing; call 2 with confirm=true books) and hb_setup_sandbox_webhook (sandbox only; never returns the signing secret). Use the generic tools below for everything else.';
+  const offered = new Set(taskToolNames);
+  const jobs = TASK_JOBS.filter(([name]) => offered.has(name)).map(([name, job]) => `${name} (${job})`);
+  const tasks = jobs.length
+    ? `Task tools do the common jobs in one call with sensible defaults, through the same safety pipeline as hb_call_operation (read-only default, plan-then-confirm, idempotency, secret redaction); prefer them when they match, and each result lists the operation ids it called. Every task tool that writes is two calls: the first returns the options or plan and sends nothing, the second needs confirm=true after the user agrees; they are hidden while the server is read-only. Which tool for which job: ${jobs.join('; ')}. Use the generic tools for everything else. HB_TASK_TOOLS (all, core or none) chooses which task tools are offered.`
+    : 'No task tools are offered (HB_TASK_TOOLS=none): use the generic tools.';
   const noBaseUrl =
     !config.apiKey && config.modeSource === 'default'
       ? 'No sandbox base URL (HB_BASE_URL) is set, so this server points at the default LIVE Hub. Someone building or learning should use a sandbox: hb://guides/portal-sandboxes shows how to create one and where its base address is.'

@@ -12,10 +12,10 @@ afterEach(async () => {
 });
 
 describe('compact mode tool list', () => {
-  it('exposes the eight meta tools plus the five read-only task tools, with annotations and mode-aware descriptions', async () => {
+  it('exposes the eight meta tools plus the thirteen read-only task tools, with annotations and mode-aware descriptions', async () => {
     const { tools } = await h.client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual(
-      ['hb_account_summary', 'hb_call_operation', 'hb_candidate_overview', 'hb_describe_event', 'hb_describe_operation', 'hb_find_candidate', 'hb_go_live_check', 'hb_list_events', 'hb_needs_attention', 'hb_search_guides', 'hb_search_operations', 'hb_status', 'hb_verify_webhook_signature'],
+      ['hb_account_summary', 'hb_billing_summary', 'hb_call_operation', 'hb_candidate_overview', 'hb_credits', 'hb_describe_event', 'hb_describe_operation', 'hb_find_candidate', 'hb_get_report', 'hb_go_live_check', 'hb_list_bookings', 'hb_list_events', 'hb_monitoring_alerts', 'hb_needs_attention', 'hb_search_guides', 'hb_search_operations', 'hb_status', 'hb_training_progress', 'hb_verify_webhook_signature', 'hb_webhook_health', 'hb_worker_status'],
     );
     const call = tools.find((t) => t.name === 'hb_call_operation')!;
     expect(call.description).toContain('[SANDBOX]');

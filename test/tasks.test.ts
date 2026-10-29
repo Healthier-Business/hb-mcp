@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { scopeAllowed } from '../src/context.js';
 import { redactor } from '../src/redact.js';
-import { allTaskTools, TASK_TOOL_NAMES } from '../src/tools/tasks.js';
+import { allTaskTools, CORE_TASK_TOOL_NAMES, READ_TASK_TOOL_NAMES, TASK_TOOL_NAMES, WRITE_TASK_TOOL_NAMES } from '../src/tools/tasks.js';
 import { startHarness, type Harness } from './helpers/harness.js';
 import { MOCK_KEY, MockHub } from './helpers/mock-hub.js';
 
@@ -32,30 +32,56 @@ const writes = (x: Harness) => x.hub.apiRequests().filter((r) => r.method !== 'G
 const ops = (r: { data: any }) => r.data.operations_called as string[];
 
 describe('task tool surface', () => {
-  it('read-only: only the five read task tools, annotated read-only; writes hidden', async () => {
+  it('read-only: only the thirteen read task tools, annotated read-only; writes hidden', async () => {
     h = await startHarness();
     const { tools } = await h.client.listTools();
-    const task = tools.filter((t) => t.name.startsWith('hb_') && (TASK_TOOL_NAMES as readonly string[]).includes(t.name));
-    expect(task.map((t) => t.name).sort()).toEqual(['hb_account_summary', 'hb_candidate_overview', 'hb_find_candidate', 'hb_go_live_check', 'hb_needs_attention']);
+    const task = tools.filter((t) => (TASK_TOOL_NAMES as readonly string[]).includes(t.name));
+    expect(task.map((t) => t.name).sort()).toEqual([...READ_TASK_TOOL_NAMES].sort());
     for (const t of task) expect(t.annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false, idempotentHint: true });
+    expect(tools).toHaveLength(8 + 13);
     expect(h.client.getInstructions()).toContain('hb_find_candidate');
-    expect(h.client.getInstructions()).toContain('hb_book_practical_training');
+    expect(h.client.getInstructions()).toContain('hb_credits');
+    expect(h.client.getInstructions()).not.toContain('hb_book_practical_training');
+    expect(h.client.getInstructions()).toContain('HB_TASK_TOOLS');
   });
 
-  it('sandbox with writes: all seven in compact (15 tools) and in full mode; write annotations are correct', async () => {
+  it('sandbox with writes: all 28 task tools in compact (36 tools) and in full mode; write annotations are correct', async () => {
     h = await startHarness(WRITE_ENV);
     const { tools } = await h.client.listTools();
-    expect(tools).toHaveLength(15);
+    expect(tools).toHaveLength(8 + 28);
+    expect(WRITE_TASK_TOOL_NAMES).toHaveLength(15);
     const by = Object.fromEntries(tools.map((t) => [t.name, t]));
+    for (const n of WRITE_TASK_TOOL_NAMES) {
+      expect(by[n], n).toBeDefined();
+      expect(by[n]!.annotations?.readOnlyHint, n).toBe(false);
+    }
     expect(by.hb_book_practical_training!.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true });
     expect(by.hb_setup_sandbox_webhook!.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false, idempotentHint: false });
+    expect(by.hb_change_booking!.annotations).toMatchObject({ destructiveHint: true, idempotentHint: false });
+    expect(by.hb_rotate_webhook_secret!.annotations).toMatchObject({ destructiveHint: true });
+    expect(by.hb_save_candidate!.annotations).toMatchObject({ destructiveHint: false, idempotentHint: true });
     expect(by.hb_book_practical_training!.description).toContain('[SANDBOX]');
     expect(by.hb_setup_sandbox_webhook!.description).toContain('SANDBOX ONLY');
+    for (const n of WRITE_TASK_TOOL_NAMES) expect((by[n]!.inputSchema as any).properties.confirm ?? n === 'hb_setup_sandbox_webhook').toBeTruthy();
     await h.close();
     h = await startHarness({ ...WRITE_ENV, HB_TOOL_MODE: 'full' });
     const full = (await h.client.listTools()).tools;
-    expect(full.filter((t) => (TASK_TOOL_NAMES as readonly string[]).includes(t.name))).toHaveLength(7);
-    expect(full).toHaveLength(186 + 5 + 7);
+    expect(full.filter((t) => (TASK_TOOL_NAMES as readonly string[]).includes(t.name))).toHaveLength(28);
+    expect(full).toHaveLength(186 + 5 + 28);
+  });
+
+  it('HB_TASK_TOOLS=core offers the first seven plus credits, bookings and webhook health; none offers no task tool', async () => {
+    h = await startHarness({ ...WRITE_ENV, HB_TASK_TOOLS: 'core' });
+    const names = (await h.client.listTools()).tools.map((t) => t.name).filter((n) => (TASK_TOOL_NAMES as readonly string[]).includes(n));
+    expect(names.sort()).toEqual([...CORE_TASK_TOOL_NAMES].sort());
+    expect(CORE_TASK_TOOL_NAMES).toHaveLength(10);
+    await h.close();
+    h = await startHarness({ HB_TASK_TOOLS: 'core' });
+    expect((await h.client.listTools()).tools).toHaveLength(8 + 8);
+    await h.close();
+    h = await startHarness({ ...WRITE_ENV, HB_TASK_TOOLS: 'none' });
+    expect((await h.client.listTools()).tools).toHaveLength(8);
+    expect(h.client.getInstructions()).not.toContain('hb_find_candidate');
   });
 
   it('HB_TOOLSETS hides task tools whose portals are not enabled', async () => {

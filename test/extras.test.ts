@@ -71,7 +71,7 @@ describe('Streamable HTTP transport', () => {
     const client = new Client({ name: 'http-test', version: '0' });
     await client.connect(new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${http.port}/mcp`)));
     const { tools } = await client.listTools();
-    expect(tools.length).toBe(13);
+    expect(tools.length).toBe(21);
     const r = await client.callTool({ name: 'hb_call_operation', arguments: { operation_id: 'hub.candidates.list' } });
     expect(r.isError).toBeFalsy();
     await client.close();
