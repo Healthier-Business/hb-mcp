@@ -1,6 +1,6 @@
 {
   "name": "@healthier-business/hub-mcp",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Model Context Protocol server for the Healthier Business Hub API v2: lets AI assistants use every Hub endpoint safely (read-only by default, sandbox first).",
   "type": "module",
   "license": "MIT",
