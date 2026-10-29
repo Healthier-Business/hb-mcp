@@ -1,3 +1,4 @@
+import { isAbsolute, resolve } from 'node:path';
 import { z } from 'zod';
 import type { LogLevel } from './log.js';
 
@@ -26,6 +27,8 @@ export interface Config {
   maxResponseChars: number;
   requestTimeoutMs: number;
   webhookSecret: string | undefined;
+  /** Directories the server may read certificate files from (HB_UPLOAD_DIRS; default: the working directory only). */
+  uploadDirs: string[];
 }
 
 export class ConfigError extends Error {}
@@ -62,6 +65,7 @@ const schema = z.object({
   HB_MAX_RESPONSE_CHARS: z.coerce.number().int().min(2000).max(2_000_000).optional(),
   HB_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1000).max(300_000).optional(),
   HB_WEBHOOK_SECRET: z.string().optional(),
+  HB_UPLOAD_DIRS: z.string().optional(),
 });
 
 export function detectMode(baseUrl: string, hbEnv: Mode | undefined): { mode: Mode; source: Config['modeSource'] } {
@@ -118,6 +122,16 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     }
   }
 
+  let uploadDirs = [process.cwd()];
+  if (e.HB_UPLOAD_DIRS && e.HB_UPLOAD_DIRS.trim() !== '') {
+    const listed = e.HB_UPLOAD_DIRS.split(',').map((s) => s.trim()).filter(Boolean);
+    const relative = listed.filter((d) => !isAbsolute(d));
+    if (relative.length) {
+      throw new ConfigError(`HB_UPLOAD_DIRS must be a comma-separated list of absolute paths; not absolute: ${relative.join(', ')}`);
+    }
+    uploadDirs = listed.map((d) => resolve(d));
+  }
+
   return {
     apiKey: e.HB_API_KEY?.trim() || undefined,
     baseUrl,
@@ -132,6 +146,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     maxResponseChars: e.HB_MAX_RESPONSE_CHARS ?? 60_000,
     requestTimeoutMs: e.HB_REQUEST_TIMEOUT_MS ?? 30_000,
     webhookSecret: e.HB_WEBHOOK_SECRET?.trim() || undefined,
+    uploadDirs,
   };
 }
 

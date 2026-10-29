@@ -31,6 +31,8 @@ const TASK_JOBS: [string, string][] = [
   ['hb_setup_sandbox_webhook', 'create a sandbox webhook, test it (never shows the secret)'],
   ['hb_redeliver_webhooks', 'redeliver failed webhooks'],
   ['hb_rotate_webhook_secret', 'rotate a webhook secret (never shows it)'],
+  ['hb_verify_certificate', 'verify a training certificate file (checks the file and price first; never shows its contents)'],
+  ['hb_verification_status', 'follow certificate verifications: status, result, timeline, report and certificate availability'],
 ];
 
 export function buildInstructions(config: Config, opCount: number, eventCount: number, taskToolNames: string[] = []): string {
@@ -49,6 +51,9 @@ export function buildInstructions(config: Config, opCount: number, eventCount: n
   const tasks = jobs.length
     ? `Task tools do the common jobs in one call with sensible defaults, through the same safety pipeline as hb_call_operation (read-only default, plan-then-confirm, idempotency, secret redaction); prefer them when they match, and each result lists the operation ids it called. Every task tool that writes is two calls: the first returns the options or plan and sends nothing, the second needs confirm=true after the user agrees; they are hidden while the server is read-only. Which tool for which job: ${jobs.join('; ')}. Use the generic tools for everything else. HB_TASK_TOOLS (all, core or none) chooses which task tools are offered.`
     : 'No task tools are offered (HB_TASK_TOOLS=none): use the generic tools.';
+  const uploads = offered.has('hb_verify_certificate')
+    ? `hb_verify_certificate reads one local certificate file (.pdf, .jpg, .jpeg or .png) by absolute path, only inside the folders listed in HB_UPLOAD_DIRS (default: the server's working directory only; ${config.uploadDirs.join(', ')} now). Hidden files, links that leave those folders, wildcards and other file types are refused. A certificate is personal data: never print, paste or summarise its contents or base64; show only its name, size and SHA-256. If the file is refused, tell the user to move it into an allowed folder or ask the owner to add one; never try another path to get around it.`
+    : undefined;
   const noBaseUrl =
     !config.apiKey && config.modeSource === 'default'
       ? 'No sandbox base URL (HB_BASE_URL) is set, so this server points at the default LIVE Hub. Someone building or learning should use a sandbox: hb://guides/portal-sandboxes shows how to create one and where its base address is.'
@@ -61,6 +66,7 @@ export function buildInstructions(config: Config, opCount: number, eventCount: n
     ...(noBaseUrl ? [noBaseUrl] : []),
     `Healthier Business Hub API v2 (${opCount} operations). Environment: ${env}. ${writes}`,
     tasks,
+    ...(uploads ? [uploads] : []),
     how,
     'People are addressed only by candidate_ref (a uuid); never by internal id, and never invent one: list or search candidates first. A candidate reference of the client\'s own (candidate_reference) is different from candidate_ref.',
     'Scopes: each operation needs a scope like occupational-health:requests:read (a :write scope also grants :read). 403 insufficient_scope means the key lacks it; tell the user which scope to add. Do not try other endpoints to work around it.',

@@ -40,7 +40,7 @@ describe('prompts', () => {
   it('lists the workflows and fills them in, mode-aware', async () => {
     h = await startHarness();
     const { prompts } = await h.client.listPrompts();
-    expect(prompts.map((p) => p.name)).toEqual(['book-practical-training', 'check-candidate-compliance', 'webhook-sandbox-setup', 'get-started-in-sandbox', 'go-live-checklist', 'onboard-candidate']);
+    expect(prompts.map((p) => p.name)).toEqual(['book-practical-training', 'check-candidate-compliance', 'webhook-sandbox-setup', 'get-started-in-sandbox', 'go-live-checklist', 'onboard-candidate', 'verify-a-certificate']);
     const book = await h.client.getPrompt({ name: 'book-practical-training', arguments: { candidate: 'Jane Doe' } });
     const text = (book.messages[0]!.content as any).text as string;
     expect(text).toContain('Jane Doe');
@@ -57,7 +57,7 @@ describe('prompts', () => {
     for (const p of prompts) {
       const args = Object.fromEntries((p.arguments ?? []).map((a) => [a.name, 'x']));
       const text = ((await h.client.getPrompt({ name: p.name, arguments: args })).messages[0]!.content as any).text as string;
-      for (const id of (text.match(/\b(?:hub|practical-training|occupational-health|online-training|webhooks)\.[a-z-]+\.[a-z.-]+[a-z]/g) ?? []).filter((i) => !i.endsWith('.uk'))) {
+      for (const id of (text.match(/\b(?:hub|practical-training|occupational-health|online-training|webhooks|training-verification)\.[a-z-]+\.[a-z.-]+[a-z]/g) ?? []).filter((i) => !i.endsWith('.uk'))) {
         expect(h.ctx.catalogue.get(id), `${p.name} mentions unknown operation ${id}`).toBeDefined();
       }
     }
@@ -71,7 +71,7 @@ describe('Streamable HTTP transport', () => {
     const client = new Client({ name: 'http-test', version: '0' });
     await client.connect(new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${http.port}/mcp`)));
     const { tools } = await client.listTools();
-    expect(tools.length).toBe(21);
+    expect(tools.length).toBe(22);
     const r = await client.callTool({ name: 'hb_call_operation', arguments: { operation_id: 'hub.candidates.list' } });
     expect(r.isError).toBeFalsy();
     await client.close();

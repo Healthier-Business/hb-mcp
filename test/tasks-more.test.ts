@@ -271,6 +271,7 @@ const MIN: Record<string, { args: Record<string, unknown>; drop: string }> = {
   hb_bulk_import_workers: { args: { portal: 'dbs-rtw', file: { filename: 'w.csv', content_text: 'first_name,last_name\nJo,B\n' } }, drop: 'dbs-rtw:imports:write' },
   hb_redeliver_webhooks: { args: { endpoint_id: 12, delivery_ids: [4501] }, drop: 'account:webhooks:write' },
   hb_rotate_webhook_secret: { args: { endpoint_id: 12 }, drop: 'account:webhooks:write' },
+  hb_verify_certificate: { args: { certificate_path: join(process.cwd(), 'test/fixtures/sample-certificate.pdf'), candidate_name: 'Jo Smith', candidate_email: 'jo.smith@example.com', agency_name_on_cert: 'Healthy Staffing Ltd' }, drop: 'training-verification:write' },
 };
 
 describe('every write task tool', () => {

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import type { AppContext } from '../context.js';
+import { scopeAllowed, type AppContext } from '../context.js';
 import { SafetyRefusal } from '../errors.js';
 import { redactor } from '../redact.js';
 import {
@@ -21,6 +21,7 @@ import {
   type Json,
   type TaskTool,
 } from './task-support.js';
+import { TV_EVENTS } from './tasks-verification.js';
 
 const WRITE_HINTS = { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true } as const;
 
@@ -291,7 +292,7 @@ export function setupSandboxWebhookTool(ctx: AppContext): TaskTool {
         properties: {
           url: { type: 'string', description: 'Public https URL that receives events (no credentials in it).' },
           name: { type: 'string', description: 'Endpoint name (default "MCP sandbox webhook").' },
-          events: { type: 'array', items: { type: 'string' }, description: 'Event names from hb_list_events. Default: course completed, training expiring, booking created and confirmed, OH request submitted and full clearance.' },
+          events: { type: 'array', items: { type: 'string' }, description: 'Event names from hb_list_events. Default: course completed, training expiring, booking created and confirmed, OH request submitted and full clearance, plus the seven training-verification events when the key has a training-verification scope.' },
           save_secret_to: { type: 'string', description: 'Absolute path of a new file to write the signing secret to (owner-only). Optional.' },
         },
         required: ['url'],
@@ -319,7 +320,8 @@ export function setupSandboxWebhookTool(ctx: AppContext): TaskTool {
 
         const known = await run.get('webhooks.events.list', { query: { per_page: 100 } });
         const allowed = new Set<string>(known.ok && Array.isArray(known.data) ? known.data.flatMap((g: Json) => (g.events ?? []).map((e: Json) => String(e.event))) : ctx.catalogue.events.map((e) => e.type));
-        const wanted = a.data.events ?? DEFAULT_EVENTS.filter((e) => allowed.has(e));
+        const withVerification = ctx.config.toolsets.includes('training-verification') && scopeAllowed(ctx.keyScopes, 'training-verification:read') === true;
+        const wanted = a.data.events ?? [...DEFAULT_EVENTS, ...(withVerification ? TV_EVENTS : [])].filter((e) => allowed.has(e));
         const unknown = wanted.filter((e) => !allowed.has(e));
         if (unknown.length) return refusal(`Unknown event(s): ${unknown.join(', ')}. Use hb_list_events for valid names. Nothing was sent.`);
         if (wanted.length === 0) return refusal('No events to subscribe to. Pass `events` (see hb_list_events). Nothing was sent.');

@@ -142,5 +142,27 @@ export function buildPrompts(ctx: AppContext): PromptDefinition[] {
           '4. Report the candidate_ref; use that for everything after.',
         ].join('\n'),
     },
+    {
+      name: 'verify-a-certificate',
+      title: 'Verify a training certificate',
+      description: 'Check the price and balance, check the certificate file, submit it for verification, then follow the status and the webhook.',
+      arguments: [
+        { name: 'certificate_path', description: 'Absolute path of the certificate file (PDF, JPG or PNG) inside an allowed folder (HB_UPLOAD_DIRS).', required: true },
+        { name: 'candidate_name', description: 'The candidate\'s name as on the certificate.', required: true },
+        { name: 'agency', description: 'The agency or training provider named on the certificate (optional: ask if unknown).', required: false },
+        { name: 'request_type', description: 'auto (default) or manual.', required: false },
+      ],
+      build: (a) =>
+        [
+          `Verify the training certificate ${a.certificate_path} for ${a.candidate_name}${a.agency ? `, agency on the certificate: ${a.agency}` : ''}${a.request_type ? `, request type: ${a.request_type}` : ''}. Environment: ${env}. ${writeLine}`,
+          'The certificate is personal data: never print, paste or summarise the file contents or its base64, and do not copy it anywhere. Only its name, size, type and SHA-256 are shown.',
+          '1. hb_status (or the status tool): confirm the environment and that the key has training-verification:write (it also reads). If the account has no Training Verification, every call is 403 portal_unavailable.',
+          `2. Price and balance: the plan of hb_verify_certificate shows them (it reads ${call('training-verification.profile.show')}, ${call('training-verification.pricing.show')} and ${call('training-verification.credits.show')}). Automated (auto) is FREE for a regular account (one that also uses other Hub services) and charged for a verification-only account; Manual is charged for everyone; credits or the wallet pay, never a card. Tell the user the price before going on, and whether the balance covers it (a shortfall is 402 insufficient_credits: top up in the Hub).`,
+          `3. File check and plan: call hb_verify_certificate with certificate_path, request_type (default auto), candidate_name, candidate_email, agency_name_on_cert and, if needed, notify_email, candidate_ref (from hb_find_candidate) and client_reference, WITHOUT confirm. It checks the file locally (it must be inside HB_UPLOAD_DIRS, not hidden, a .pdf, .jpg, .jpeg or .png within the size limit) and sends nothing. Ask the user for any missing detail; never invent an email address. Show the plan: file name, size, SHA-256, who gets the result email, price and balance.`,
+          '4. After the user says yes, call the same tool again with the same arguments, the idempotency_key from the plan, file_sha256 from the plan and confirm=true. The answer is 202 with the verification id and status pending. Repeating with the same idempotency_key never charges twice.',
+          '5. Follow it: hb_verification_status with verification_id shows the status (pending, processing, verified, not_found, rejected, failed), the result and the timeline. Automated usually finishes in minutes; Manual stays processing until staff decide. A pending verification can be cancelled with hb_change_booking (portal training-verification, booking_id = the verification id), which refunds a charge.',
+          `6. Webhooks (optional): events training-verification.submitted, .processing, .verified, .not_found, .rejected, .failed and .refunded, each once per verification, carrying ids, status, reason code and the candidate name but never the certificate. In a sandbox hb_setup_sandbox_webhook subscribes them all when the key has a training-verification scope; verify deliveries with hb_verify_webhook_signature. ${call('training-verification.verifications.report')} (a PDF, once verified) and ${call('training-verification.verifications.certificate')} download files: use hb_get_report for how, and do not print them.`,
+        ].join('\n'),
+    },
   ];
 }

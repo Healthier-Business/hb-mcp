@@ -7,9 +7,10 @@ import { acknowledgeAlertsTool, bulkImportWorkersTool, verifyWorkerTool } from '
 import { assignTrainingTool, chaseOutstandingTool, requestOccupationalHealthTool, requestReferencesTool, saveCandidateTool } from './tasks-people.js';
 import { bookSlotTool, changeBookingTool, inviteToPracticalTool } from './tasks-bookings.js';
 import { redeliverWebhooksTool, rotateWebhookSecretTool } from './tasks-webhooks.js';
+import { verificationStatusTool, verifyCertificateTool } from './tasks-verification.js';
 import type { ToolDefinition } from './types.js';
 
-/** The first seven task tools built, plus hb_credits, hb_list_bookings and hb_webhook_health: HB_TASK_TOOLS=core. */
+/** The first seven task tools built, plus hb_credits, hb_list_bookings, hb_webhook_health and hb_verification_status: HB_TASK_TOOLS=core. */
 export const CORE_TASK_TOOL_NAMES = [
   'hb_find_candidate',
   'hb_candidate_overview',
@@ -21,6 +22,7 @@ export const CORE_TASK_TOOL_NAMES = [
   'hb_credits',
   'hb_list_bookings',
   'hb_webhook_health',
+  'hb_verification_status',
 ] as const;
 
 /** Task tools that only read. */
@@ -38,6 +40,7 @@ export const READ_TASK_TOOL_NAMES = [
   'hb_worker_status',
   'hb_billing_summary',
   'hb_get_report',
+  'hb_verification_status',
 ] as const;
 
 /** Task tools that write (two-call plan then confirm; hidden while read-only). */
@@ -57,18 +60,19 @@ export const WRITE_TASK_TOOL_NAMES = [
   'hb_bulk_import_workers',
   'hb_redeliver_webhooks',
   'hb_rotate_webhook_secret',
+  'hb_verify_certificate',
 ] as const;
 
 export const TASK_TOOL_NAMES = [...READ_TASK_TOOL_NAMES, ...WRITE_TASK_TOOL_NAMES] as const;
 
 const MORE_WRITE_TASKS = [
   bookSlotTool, changeBookingTool, inviteToPracticalTool, saveCandidateTool, assignTrainingTool, requestReferencesTool, requestOccupationalHealthTool,
-  chaseOutstandingTool, verifyWorkerTool, acknowledgeAlertsTool, bulkImportWorkersTool, redeliverWebhooksTool, rotateWebhookSecretTool,
+  chaseOutstandingTool, verifyWorkerTool, acknowledgeAlertsTool, bulkImportWorkersTool, redeliverWebhooksTool, rotateWebhookSecretTool, verifyCertificateTool,
 ];
 
 /** Every task tool, whether or not it is offered with this configuration (tests use this to reach hidden ones). */
 export function allTaskTools(ctx: AppContext) {
-  return [...READ_TASKS, ...READ_TASKS_MORE, ...WRITE_TASKS, ...MORE_WRITE_TASKS].map((make) => make(ctx));
+  return [...READ_TASKS, ...READ_TASKS_MORE, verificationStatusTool, ...WRITE_TASKS, ...MORE_WRITE_TASKS].map((make) => make(ctx));
 }
 
 /**

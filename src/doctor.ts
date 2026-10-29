@@ -1,4 +1,4 @@
-import { writesEnabled, type Config } from './config.js';
+import { TOOLSETS, writesEnabled, type Config } from './config.js';
 import { SERVER_VERSION } from './context.js';
 import { describeError, HubApiError } from './errors.js';
 import { TokenManager } from './tokens.js';
@@ -20,7 +20,7 @@ export async function runDoctor(config: Config, fetchImpl: typeof fetch = fetch)
   add(major >= 20 ? 'ok' : 'fail', `Node ${major >= 20 ? 'is new enough' : 'must be 20 or newer'}`);
   add('info', `Environment: ${config.mode.toUpperCase()} (detected from ${config.modeSource}), base URL ${config.baseUrl}`);
   if (config.mode === 'live') add('warn', 'This is the LIVE Hub. Use a sandbox while building.');
-  add('info', `Tool mode: ${config.toolMode}; toolsets: ${config.toolsets.length === 12 ? 'all' : config.toolsets.join(', ')}`);
+  add('info', `Tool mode: ${config.toolMode}; toolsets: ${config.toolsets.length === TOOLSETS.length ? 'all' : config.toolsets.join(', ')}`);
   add(config.readOnly ? 'ok' : 'warn', config.readOnly ? 'Read-only (HB_READ_ONLY=true): writes are refused.' : `Writes enabled: ${writesEnabled(config) ? 'yes' : 'no (live writes need HB_ALLOW_LIVE_WRITES=true)'}`);
 
   if (!config.apiKey) {

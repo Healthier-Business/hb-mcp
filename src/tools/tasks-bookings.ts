@@ -208,16 +208,18 @@ const CHANGE = {
   'practical-training': { label: 'practical training', show: 'practical-training.bookings.show', cancel: 'practical-training.bookings.cancel', reschedule: undefined, slots: undefined, typeKey: undefined, windowHours: 48 },
   'virtual-bls-training': { label: 'virtual BLS', show: 'virtual-bls-training.bookings.show', cancel: 'virtual-bls-training.bookings.cancel', reschedule: 'virtual-bls-training.bookings.reschedule', slots: 'virtual-bls-training.timeslots.list', typeKey: 'course_id', windowHours: 120 },
   'clinical-interviews': { label: 'clinical interview', show: 'clinical-interviews.bookings.show', cancel: 'clinical-interviews.bookings.cancel', reschedule: 'clinical-interviews.bookings.reschedule', slots: 'clinical-interviews.timeslots.list', typeKey: 'interview_type_id', windowHours: 24 },
+  'training-verification': { label: 'certificate verification', show: 'training-verification.verifications.show', cancel: 'training-verification.verifications.cancel', reschedule: undefined, slots: undefined, typeKey: undefined, windowHours: 0 },
 } as const;
 
 const REFUND_RULES: Record<string, string> = {
   'practical-training': 'Cancelling: a booking paid with credits or balance gets it back when the session is 48 hours or more away (or inside 48 hours if the account still has a free cancellation this month); card payments are refunded in full outside 48 hours, 20% if the candidate already used the online training, nothing inside 48 hours; invoiced bookings are not charged. The candidate is emailed.',
   'virtual-bls-training': 'Cancelling: more than 120 hours (5 days) before the start the booking is refund eligible and refunded automatically to credits, balance or card; inside 120 hours nothing is refunded. The trainer and the Zoom meeting are released and the candidate is emailed. Rescheduling inside 120 hours needs a flat fee paid first (the call answers 402 payment_required with a payment_url).',
+  'training-verification': 'Cancelling is possible only while the verification is pending (not yet started). It becomes rejected with the reason cancelled_by_client, no email is sent and a charge is refunded to where it came from (a credit back to its ledger, money to the money balance, the older balance restored); a free request has nothing to refund. The webhooks training-verification.rejected and training-verification.refunded fire. In any other status the Hub answers 409 not_cancellable.',
   'clinical-interviews': 'Cancelling: 24 hours or more before the start is free (credit, money or card is given back, invoiced interviews are left off the invoice); under 24 hours is a late cancellation with nothing given back. Rescheduling: free with 24 hours notice; under 24 hours it counts as a late cancellation plus a new booking (credits get one free late reschedule, then a new credit is taken). The candidate, agency contact and interviewer are emailed.',
 };
 
 const changeArgs = z.object({
-  portal: z.enum(['practical-training', 'virtual-bls-training', 'clinical-interviews']),
+  portal: z.enum(['practical-training', 'virtual-bls-training', 'clinical-interviews', 'training-verification']),
   booking_id: z.number().int(),
   action: z.enum(['cancel', 'reschedule']),
   date: DATE.optional(),
@@ -229,17 +231,17 @@ export const changeBookingTool = writeTask({
   name: 'hb_change_booking',
   title: 'Cancel or reschedule a booking',
   description:
-    'Cancel (practical training, virtual BLS, clinical interviews) or reschedule (virtual BLS and clinical interviews only: the API has no reschedule for practical training) a booking, in two calls. CALL 1 shows the booking, whether it can be changed, how far away it is and the refund or fee rules of that portal (what is paid back, or whether a late cancellation applies), and for a reschedule checks the new slot is free; nothing is changed. CALL 2 with confirm=true does it and reports the refund or fee fields the API returns. The candidate is emailed (a real person on live). Cancelling is hard to undo. Uses the portal\'s bookings.show/.cancel/.reschedule and timeslots.list.',
+    'Cancel (practical training, virtual BLS, clinical interviews, and certificate verifications of training-verification, only while pending) or reschedule (virtual BLS and clinical interviews only: the API has no reschedule for practical training or verifications) a booking, in two calls. CALL 1 shows the booking, whether it can be changed, how far away it is and the refund or fee rules of that portal (what is paid back, or whether a late cancellation applies), and for a reschedule checks the new slot is free; nothing is changed. CALL 2 with confirm=true does it and reports the refund or fee fields the API returns. The candidate is emailed (a real person on live; a verification cancel sends no email and shows the refund effect instead). Cancelling is hard to undo. For portal training-verification, booking_id is the verification id. Uses the portal\'s bookings.show/.cancel/.reschedule and timeslots.list (verifications.show/.cancel).',
   properties: {
-    portal: { type: 'string', enum: ['practical-training', 'virtual-bls-training', 'clinical-interviews'] },
-    booking_id: { type: 'integer' },
+    portal: { type: 'string', enum: ['practical-training', 'virtual-bls-training', 'clinical-interviews', 'training-verification'] },
+    booking_id: { type: 'integer', description: 'The booking id (for training-verification: the verification id).' },
     action: { type: 'string', enum: ['cancel', 'reschedule'] },
     date: { type: 'string', description: 'Reschedule: new day YYYY-MM-DD (UK local).' },
     time: { type: 'string', description: 'Reschedule: new start time HH:MM (UK local).' },
   },
   required: ['portal', 'booking_id', 'action'],
   schema: changeArgs,
-  availability: { anyOf: ['practical-training', 'virtual-bls-training', 'clinical-interviews'] },
+  availability: { anyOf: ['practical-training', 'virtual-bls-training', 'clinical-interviews', 'training-verification'] },
   destructive: true,
   idempotent: false,
   ops: (a) => {
@@ -250,6 +252,21 @@ export const changeBookingTool = writeTask({
     const { run, args } = c;
     const p = CHANGE[args.portal];
     const problems: string[] = [];
+    if (args.portal === 'training-verification') {
+      if (args.action !== 'cancel') return { lines: ['A certificate verification cannot be rescheduled: only cancelled while pending. To check a certificate again submit it with hb_verify_certificate.'], problems: ['only cancel is available for a verification.'] };
+      const show = await run.get(p.show, { path_params: { verification: args.booking_id } });
+      if (!show.ok) return { lines: [`The verification could not be read: ${why(show)}.`], problems: ['the verification could not be read.'] };
+      const v = show.data ?? {};
+      const charge = v.charge ?? {};
+      const lines = [
+        `Verification #${v.id}: ${v.candidate_name ?? '-'}, ${v.request_type ?? '-'}, status ${v.status}${v.client_reference ? `, your reference ${v.client_reference}` : ''}, created ${when(v.created_at)}.`,
+        charge.free ? 'It was free: there is nothing to refund.' : `It was charged ${money(charge.amount_pence, charge.currency)}${charge.credits_used ? ` (${charge.credits_used} credit)` : ''}${charge.funding ? ` from ${charge.funding}` : ''}${charge.refunded ? ' and is already refunded' : ''}: cancelling refunds it to where it came from.`,
+        REFUND_RULES['training-verification'] as string,
+        'No email is sent when a verification is cancelled; the certificate is not deleted by this.',
+      ];
+      if (v.status !== 'pending') problems.push(`the verification is ${v.status}; only a pending verification can be cancelled.`);
+      return { lines, problems, data: { verification: { id: v.id, status: v.status, request_type: v.request_type, charge: v.charge } } };
+    }
     if (args.action === 'reschedule' && !p.reschedule) return { lines: [`The API has no reschedule for ${p.label} bookings. Cancel and book again (hb_book_practical_training) instead.`], problems: ['reschedule is not available for this portal.'] };
     const show = await run.get(p.show, { path_params: { booking: args.booking_id } });
     if (!show.ok) return { lines: [`The booking could not be read: ${why(show)}.`], problems: ['the booking could not be read.'] };
@@ -281,6 +298,14 @@ export const changeBookingTool = writeTask({
   execute: async (c) => {
     const { args } = c;
     const p = CHANGE[args.portal];
+    if (args.portal === 'training-verification') {
+      const r = await send(c as WriteCtx<unknown>, p.cancel, { path_params: { verification: args.booking_id } }, 'cancel');
+      if (!r.ok) return failed(c, 'The verification was not cancelled', r, r.status === 409 ? 'Only a pending verification can be cancelled; it may have started since the plan.' : undefined);
+      const v = r.data ?? {};
+      const ch = v.charge ?? {};
+      const refund = ch.free ? 'free, nothing to refund' : ch.refunded ? `refunded (${money(ch.amount_pence, ch.currency)}${ch.credits_used ? `, ${ch.credits_used} credit` : ''})` : 'the refund did not complete: the cancellation stands and Healthier Business completes the refund';
+      return done(c, [`Cancelled verification #${v.id ?? args.booking_id}: status ${v.status ?? '-'}${v.result?.reason?.code ? ` (${v.result.reason.code})` : ''}; ${refund}.`], { verification: { id: v.id, status: v.status, charge: v.charge, reason_code: v.result?.reason?.code } });
+    }
     if (args.action === 'cancel') {
       const r = await send(c as WriteCtx<unknown>, p.cancel, { path_params: { booking: args.booking_id } }, 'cancel');
       if (!r.ok) return failed(c, 'The booking was not cancelled', r);

@@ -28,6 +28,7 @@ const PORTAL_LABELS: Record<string, string> = {
   'occupational-health': 'Occupational health',
   'dbs-rtw': 'DBS and right to work',
   'registration-monitoring': 'Registration monitoring',
+  'training-verification': 'Training verification',
 };
 
 function problem(ctx: AppContext, run: TaskRun, tool: string, r: CallOutcome) {
@@ -243,6 +244,7 @@ const CREDIT_OPS: { toolset: string; show: string; tx: string }[] = [
   { toolset: 'virtual-bls-training', show: 'virtual-bls-training.credits.show', tx: 'virtual-bls-training.credits.transactions' },
   { toolset: 'clinical-interviews', show: 'clinical-interviews.credits.show', tx: 'clinical-interviews.credits.transactions' },
   { toolset: 'clinical-appraisals', show: 'clinical-appraisals.credits.show', tx: 'clinical-appraisals.credits.transactions' },
+  { toolset: 'training-verification', show: 'training-verification.credits.show', tx: 'training-verification.credits.transactions' },
 ];
 
 const sumCredits = (list: unknown): number => (Array.isArray(list) ? list.reduce((t: number, x: Json) => t + (Number(x?.credits) || 0), 0) : 0);
@@ -254,14 +256,17 @@ function balanceLine(d: Json): string {
   if (Array.isArray(d.booking_credits)) parts.push(`${sumCredits(d.booking_credits)} booking credits (${d.booking_credits.map((x: Json) => `${x.course_name ?? x.interview_type_name ?? x.appraisal_type_name ?? '?'}: ${x.credits}`).join(', ') || 'none'})`);
   if (Array.isArray(d.interview_type_group_credits) && d.interview_type_group_credits.length) parts.push(`group credits ${sumCredits(d.interview_type_group_credits)}`);
   if (typeof d.all_interview_types_credits === 'number') parts.push(`all-types credits ${d.all_interview_types_credits}`);
-  const pence = d.booking_balance_pence ?? d.booking_money_balance_pence;
+  const pence = d.booking_balance_pence ?? d.booking_money_balance_pence ?? d.money_pence;
   if (typeof pence === 'number') parts.push(`money balance ${money(pence, d.currency)}`);
+  if (typeof d.auto_credits === 'number') parts.push(`${d.auto_credits} automated verification credit(s)`);
+  if (typeof d.manual_credits === 'number') parts.push(`${d.manual_credits} manual verification credit(s)`);
+  if (typeof d.legacy_balance_pence === 'number') parts.push(`older balance ${money(d.legacy_balance_pence, d.currency)}`);
   if (typeof d.price_per_credit_pence === 'number') parts.push(`${money(d.price_per_credit_pence, d.currency)} per credit`);
   return parts.join('; ') || 'no balance information';
 }
 
 function txLine(t: Json): string {
-  const amount = t.amount_pence != null ? money(t.amount_pence, t.currency) : t.amount != null ? `${t.is_credit === false ? '-' : t.is_credit === true ? '+' : ''}${t.amount} credit(s)` : t.credits != null ? `${t.credits} credit(s)` : '';
+  const amount = t.amount_pence != null ? money(t.amount_pence, t.currency) : t.unit === 'pence' && typeof t.amount === 'number' ? `${t.is_credit === false ? '-' : '+'}${money(t.amount, t.currency)}` : t.amount != null ? `${t.is_credit === false ? '-' : t.is_credit === true ? '+' : ''}${t.amount} credit(s)` : t.credits != null ? `${t.credits} credit(s)` : '';
   const kind = t.type ?? (t.is_credit === true ? 'credit' : t.is_credit === false ? 'debit' : '');
   return `${day(t.created_at)} ${kind} ${amount}${t.description ? `: ${t.description}` : ''}${t.booking_id ? ` (booking #${t.booking_id})` : ''}`.replace(/\s+/g, ' ').trim();
 }
@@ -274,7 +279,7 @@ export function creditsTool(ctx: AppContext): TaskTool {
     definition: {
       name: 'hb_credits',
       description:
-        'Credit and balance figures for every portal the key can reach (online training, occupational health, practical training, virtual BLS, clinical interviews, clinical appraisals), with the most recent transactions, plus the occupational health credit packages. Credits are units; money is shown as an amount with its currency. Read-only. Portals the key cannot read are listed as skipped.',
+        'Credit and balance figures for every portal the key can reach (online training, occupational health, practical training, virtual BLS, clinical interviews, clinical appraisals, training verification), with the most recent transactions, plus the occupational health credit packages. Credits are units; money is shown as an amount with its currency. Read-only. Portals the key cannot read are listed as skipped.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -295,7 +300,7 @@ export function creditsTool(ctx: AppContext): TaskTool {
           CREDIT_OPS.map(async (c) => ({
             c,
             show: await run.get(c.show, {}),
-            tx: wantTx ? await run.get(c.tx, { query: { per_page: recent, ...(c.toolset === 'online-training' || c.toolset === 'occupational-health' ? {} : { sort: '-created_at' }) } }) : undefined,
+            tx: wantTx ? await run.get(c.tx, { query: { per_page: recent, ...(c.toolset === 'online-training' || c.toolset === 'occupational-health' || c.toolset === 'training-verification' ? {} : { sort: '-created_at' }) } }) : undefined,
           })),
         );
         const packages = await run.get('occupational-health.credits.packages', { query: { per_page: 25 } });
@@ -622,7 +627,7 @@ export function billingSummaryTool(ctx: AppContext): TaskTool {
 
 // ------------------------------------------------------------------------------------------ hb_get_report
 
-const REPORT_KINDS = ['practical_certificate', 'virtual_bls_certificate', 'online_training_certificate', 'interview_report', 'appraisal_report', 'occupational_health_reports'] as const;
+const REPORT_KINDS = ['practical_certificate', 'virtual_bls_certificate', 'online_training_certificate', 'interview_report', 'appraisal_report', 'occupational_health_reports', 'verification_report', 'verification_certificate'] as const;
 const reportArgs = z.object({
   kind: z.enum(REPORT_KINDS),
   booking_id: z.number().int().optional(),
@@ -632,27 +637,29 @@ const reportArgs = z.object({
   check_download: z.boolean().optional(),
 });
 
-const REPORT_SPEC: Record<(typeof REPORT_KINDS)[number], { toolset: string; show?: string; flag?: string; download?: string; path?: string; label: string; health?: boolean }> = {
+const REPORT_SPEC: Record<(typeof REPORT_KINDS)[number], { toolset: string; show?: string; flag?: string; download?: string; path?: string; label: string; health?: boolean; personal?: boolean }> = {
   practical_certificate: { toolset: 'practical-training', show: 'practical-training.bookings.show', flag: 'certificate_available', download: 'practical-training.bookings.certificate', path: '/practical-training/bookings/{id}/certificate', label: 'Practical training attendance certificate' },
   virtual_bls_certificate: { toolset: 'virtual-bls-training', show: 'virtual-bls-training.bookings.show', flag: 'certificate_available', download: 'virtual-bls-training.bookings.certificate', path: '/virtual-bls-training/bookings/{id}/certificate', label: 'Virtual BLS certificate' },
   online_training_certificate: { toolset: 'online-training', download: 'online-training.candidates.certificate', path: '/online-training/candidates/{ref}/certificate', label: 'Online training certificate' },
   interview_report: { toolset: 'clinical-interviews', show: 'clinical-interviews.bookings.show', flag: 'interview_report_available', download: 'clinical-interviews.bookings.interview-report', path: '/clinical-interviews/bookings/{id}/interview-report', label: 'Clinical interview report', health: true },
   appraisal_report: { toolset: 'clinical-appraisals', show: 'clinical-appraisals.bookings.show', flag: 'evaluation_report_available', download: 'clinical-appraisals.bookings.evaluation-report', path: '/clinical-appraisals/bookings/{id}/evaluation-report', label: 'Clinical appraisal evaluation report', health: true },
   occupational_health_reports: { toolset: 'occupational-health', label: 'Occupational health reports' },
+  verification_report: { toolset: 'training-verification', show: 'training-verification.verifications.show', flag: 'status', download: 'training-verification.verifications.report', path: '/training-verification/verifications/{id}/report', label: 'Training verification report', personal: true },
+  verification_certificate: { toolset: 'training-verification', show: 'training-verification.verifications.show', flag: 'certificate_available', download: 'training-verification.verifications.certificate', path: '/training-verification/verifications/{id}/certificate', label: 'Submitted training certificate (the file you uploaded)', personal: true },
 };
 
 export function getReportTool(ctx: AppContext): TaskTool {
   return {
-    availability: { anyOf: ['practical-training', 'virtual-bls-training', 'online-training', 'clinical-interviews', 'clinical-appraisals', 'occupational-health'] },
+    availability: { anyOf: ['practical-training', 'virtual-bls-training', 'online-training', 'clinical-interviews', 'clinical-appraisals', 'occupational-health', 'training-verification'] },
     definition: {
       name: 'hb_get_report',
       description:
-        'Certificate and report details with how to download them: practical training, virtual BLS and online training certificates, clinical interview report, clinical appraisal evaluation report, and the occupational health reports list. Returns whether the file exists, its metadata and the exact API address and instructions to download it. File bytes are never returned in the answer: with check_download=true the server fetches the file only to report its type and size, then discards it. Interview and appraisal reports are health data: use only what the task needs. Read-only. Uses the booking show operations, the certificate/report download operations and occupational-health.reports.list.',
+        'Certificate and report details with how to download them: practical training, virtual BLS and online training certificates, clinical interview report, clinical appraisal evaluation report, the occupational health reports list, and for Training Verification the verification report (kind verification_report, available once verified) and the submitted certificate file (kind verification_certificate); booking_id is the verification id for those. Returns whether the file exists, its metadata and the exact API address and instructions to download it. File bytes are never returned in the answer: with check_download=true the server fetches the file only to report its type and size, then discards it. Interview and appraisal reports are health data, and verification certificates and reports are personal data: use only what the task needs. Read-only. Uses the booking show operations, the certificate/report download operations and occupational-health.reports.list.',
       inputSchema: {
         type: 'object',
         properties: {
           kind: { type: 'string', enum: [...REPORT_KINDS] },
-          booking_id: { type: 'integer', description: 'For booking based kinds.' },
+          booking_id: { type: 'integer', description: 'For booking based kinds (for verification_report and verification_certificate: the verification id).' },
           candidate_ref: { type: 'string', description: 'For online_training_certificate.' },
           certificate_type: { type: 'string', description: 'Online training: current (default), assigned, all, excl-expired, incl-expired, range, course, care, cstf.' },
           course_id: { type: 'integer', description: 'Online training type=course.' },
@@ -696,12 +703,17 @@ export function getReportTool(ctx: AppContext): TaskTool {
         } else {
           if (a.data.booking_id === undefined) return refusal('booking_id is needed for this kind of report.');
           path = path.replace('{id}', String(a.data.booking_id));
-          args.path_params = { booking: a.data.booking_id };
+          args.path_params = spec.toolset === 'training-verification' ? { verification: a.data.booking_id } : { booking: a.data.booking_id };
           const show = await run.get(spec.show as string, args);
           if (!show.ok) return problem(ctx, run, 'hb_get_report', show);
           const b = show.data ?? {};
-          flag = Boolean(b[spec.flag as string]);
-          metadata = { booking_id: b.id, candidate_ref: b.candidate_ref, status: b.booking_status, start_date: b.start_date, [spec.flag as string]: flag };
+          if (spec.toolset === 'training-verification') {
+            flag = a.data.kind === 'verification_report' ? b.status === 'verified' : b.certificate_available === true;
+            metadata = { verification_id: b.id, status: b.status, request_type: b.request_type, candidate_ref: b.candidate_ref, client_reference: b.client_reference, [a.data.kind === 'verification_report' ? 'report_available' : 'certificate_available']: flag };
+          } else {
+            flag = Boolean(b[spec.flag as string]);
+            metadata = { booking_id: b.id, candidate_ref: b.candidate_ref, status: b.booking_status, start_date: b.start_date, [spec.flag as string]: flag };
+          }
         }
 
         let download: Json | undefined;
@@ -715,11 +727,12 @@ export function getReportTool(ctx: AppContext): TaskTool {
           `${spec.label}${flag === undefined ? '' : flag ? ': available' : ': not available yet'}.`,
           ...(Object.keys(metadata).length ? [`Details: ${Object.entries(metadata).map(([k, v]) => `${k}=${v}`).join(', ')}.`] : []),
           ...(download ? [download.problem ? `Download check: ${download.problem}.` : `Download check: ${download.content_type ?? 'file'}, ${download.size_bytes ?? '?'} bytes (not included here).`] : []),
-          `Download: GET ${url}${args.query ? `?${new URLSearchParams(args.query as Record<string, string>).toString()}` : ''} with the header Authorization: Bearer <access token> (exchange the key with POST /api/v2/auth/token; never paste the key or token in chat), for example with curl --output. The response is a PDF file, not JSON.`,
+          `Download: GET ${url}${args.query ? `?${new URLSearchParams(args.query as Record<string, string>).toString()}` : ''} with the header Authorization: Bearer <access token> (exchange the key with POST /api/v2/auth/token; never paste the key or token in chat), for example with curl --output. The response is ${a.data.kind === 'verification_certificate' ? 'the original file (PDF, JPG or PNG)' : 'a PDF file'}, not JSON.`,
           ...(spec.health ? ['This report is health data (special category): download it only if the task needs it and keep it out of tickets, chat and logs.'] : []),
+          ...(spec.personal ? ['This file is personal data (the candidate\'s name and training record): download it only if the task needs it and keep it out of tickets, chat and logs. A download of the certificate is recorded on the verification.'] : []),
           done(run),
         ];
-        return taskResult(ctx, run, { lines, data: { kind: a.data.kind, available: flag, metadata, download_check: download, download_url: url, download_method: 'GET', content_type: 'application/pdf', health_data: spec.health === true } });
+        return taskResult(ctx, run, { lines, data: { kind: a.data.kind, available: flag, metadata, download_check: download, download_url: url, download_method: 'GET', content_type: a.data.kind === 'verification_certificate' ? 'application/pdf, image/jpeg or image/png' : 'application/pdf', health_data: spec.health === true, personal_data: spec.personal === true } });
       },
     },
   };

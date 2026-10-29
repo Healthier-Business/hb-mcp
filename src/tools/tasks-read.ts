@@ -222,6 +222,14 @@ const PROBES: PortalProbe[] = [
     summarise: (r) => rows(r).map((b) => `${b.interview_type?.name ?? 'interview'}: ${b.interview_status ?? '-'}, booking ${b.booking_status ?? '-'}, ${when(b.start_date)}`),
   },
   {
+    toolset: 'training-verification',
+    label: 'Training verification',
+    op: 'training-verification.verifications.list',
+    args: LIST({ sort: '-created_at' }),
+    // Linked through candidate_ref: status, type, reason code and dates only. No certificate, courses found, email or name.
+    summarise: (r) => rows(r).map((v) => `verification #${v.id} (${v.request_type ?? '-'}): ${v.status ?? '-'}${v.result?.reason?.code ? `, reason ${v.result.reason.code}` : ''}${v.client_reference ? `, ref ${v.client_reference}` : ''}; created ${day(v.created_at)}, completed ${day(v.completed_at)}`),
+  },
+  {
     toolset: 'occupational-health',
     label: 'Occupational health',
     op: 'occupational-health.requests.list',
@@ -237,7 +245,7 @@ export function candidateOverviewTool(ctx: AppContext): TaskTool {
     definition: {
       name: 'hb_candidate_overview',
       description:
-        'One-call summary of a candidate across every portal the key can reach: online training, practical training, virtual BLS, references, DBS and right to work, registration monitoring, clinical appraisals, clinical interviews and occupational health. One line per record with status and dates. Checks the key\'s scopes first, calls only what is allowed, and says which portals were skipped and why. Occupational health is statuses and dates only (never answers, clearance detail or documents). Read-only. Needs hub:candidates:read plus the portal read scopes you want.',
+        'One-call summary of a candidate across every portal the key can reach: online training, practical training, virtual BLS, references, DBS and right to work, registration monitoring, clinical appraisals, clinical interviews, certificate verifications (training verification, linked by candidate_ref) and occupational health. One line per record with status and dates. Checks the key\'s scopes first, calls only what is allowed, and says which portals were skipped and why. Occupational health is statuses and dates only (never answers, clearance detail or documents). Read-only. Needs hub:candidates:read plus the portal read scopes you want.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -324,6 +332,7 @@ const CREDIT_PORTALS: { toolset: string; label: string; op: string }[] = [
   { toolset: 'virtual-bls-training', label: 'Virtual BLS', op: 'virtual-bls-training.credits.show' },
   { toolset: 'clinical-interviews', label: 'Clinical interviews', op: 'clinical-interviews.credits.show' },
   { toolset: 'clinical-appraisals', label: 'Clinical appraisals', op: 'clinical-appraisals.credits.show' },
+  { toolset: 'training-verification', label: 'Training verification', op: 'training-verification.credits.show' },
 ];
 
 const sum = (list: unknown): number => (Array.isArray(list) ? list.reduce((t: number, x: Json) => t + (Number(x?.credits) || 0), 0) : 0);
@@ -334,8 +343,11 @@ function creditLine(d: Json): string {
   if (typeof d.used_this_month === 'number') parts.push(`used this month ${d.used_this_month}`);
   if (Array.isArray(d.booking_credits)) parts.push(`${sum(d.booking_credits)} booking credits`);
   if (Array.isArray(d.interview_type_group_credits) && d.interview_type_group_credits.length) parts.push(`${sum(d.interview_type_group_credits)} group credits`);
-  const pence = d.booking_balance_pence ?? d.booking_money_balance_pence;
+  const pence = d.booking_balance_pence ?? d.booking_money_balance_pence ?? d.money_pence;
   if (typeof pence === 'number') parts.push(`money balance ${money(pence, d.currency)}`);
+  if (typeof d.auto_credits === 'number') parts.push(`${d.auto_credits} automated verification credit(s)`);
+  if (typeof d.manual_credits === 'number') parts.push(`${d.manual_credits} manual verification credit(s)`);
+  if (typeof d.legacy_balance_pence === 'number') parts.push(`older balance ${money(d.legacy_balance_pence, d.currency)}`);
   return parts.join(', ') || 'no balance information';
 }
 
@@ -350,7 +362,7 @@ const DELIVERY_ENDPOINT_MAX = 5;
 
 export function accountSummaryTool(ctx: AppContext): TaskTool {
   return {
-    availability: { anyOf: ['account', 'online-training', 'occupational-health', 'practical-training', 'virtual-bls-training', 'clinical-interviews', 'clinical-appraisals'] },
+    availability: { anyOf: ['account', 'online-training', 'occupational-health', 'practical-training', 'virtual-bls-training', 'clinical-interviews', 'clinical-appraisals', 'training-verification'] },
     definition: {
       name: 'hb_account_summary',
       description:
@@ -419,6 +431,7 @@ export function accountSummaryTool(ctx: AppContext): TaskTool {
 // ----------------------------------------------------------------------------------------- hb_needs_attention
 
 const SAMPLE = 5;
+const PENDING_STUCK_MS = 60 * 60 * 1000;
 
 interface Finding {
   area: string;
@@ -430,11 +443,11 @@ interface Finding {
 
 export function needsAttentionTool(ctx: AppContext): TaskTool {
   return {
-    availability: { anyOf: ['account', 'online-training', 'occupational-health', 'practical-training', 'virtual-bls-training', 'clinical-interviews', 'clinical-appraisals', 'references', 'dbs-rtw', 'registration-monitoring'] },
+    availability: { anyOf: ['account', 'online-training', 'occupational-health', 'practical-training', 'virtual-bls-training', 'clinical-interviews', 'clinical-appraisals', 'references', 'dbs-rtw', 'registration-monitoring', 'training-verification'] },
     definition: {
       name: 'hb_needs_attention',
       description:
-        'What needs action right now, built only from what the API exposes and the key can read: failed or disabled webhook endpoints, unacknowledged DBS/RTW and registration alerts, bookings awaiting payment (practical, virtual BLS, clinical interviews, clinical appraisals), appraisals awaiting documents, expired or lapsing online training, expired reference requests, and occupational health counts (awaiting candidate, rejected or failed; counts only, no health detail). Read-only. Portals the key cannot read are listed as skipped.',
+        'What needs action right now, built only from what the API exposes and the key can read: failed or disabled webhook endpoints, unacknowledged DBS/RTW and registration alerts, bookings awaiting payment (practical, virtual BLS, clinical interviews, clinical appraisals), appraisals awaiting documents, expired or lapsing online training, expired reference requests, certificate verifications that failed or have been pending for over an hour (training verification), and occupational health counts (awaiting candidate, rejected or failed; counts only, no health detail). Read-only. Portals the key cannot read are listed as skipped.',
       inputSchema: { type: 'object', properties: {}, additionalProperties: false },
       annotations: { title: 'What needs attention', ...readOnlyHints() },
       handler: async () => {
@@ -483,6 +496,10 @@ export function needsAttentionTool(ctx: AppContext): TaskTool {
           (b) => `#${b.id} ${b.candidate_name ?? b.candidate_ref}: ${b.appraisal_type?.name ?? 'appraisal'}`, 'Chase the candidate to pay (the booking has a payment_url).', { status: 'pending' });
         pending('clinical-appraisals (documents)', 'clinical-appraisals.bookings.list', 'clinical appraisal(s) awaiting documents', (b) => b.appraisal_status === 'pending_docs',
           (b) => `#${b.id} ${b.candidate_name ?? b.candidate_ref}: ${b.appraisal_type?.name ?? 'appraisal'}`, 'The candidate must submit documents before a slot can be booked.', { appraisal_status: 'pending_docs' });
+        pending('training-verification (failed)', 'training-verification.verifications.list', 'certificate verification(s) failed', (v) => v.status === 'failed',
+          (v) => `#${v.id} ${v.candidate_name ?? '-'} (${v.request_type}): failed${v.result?.reason?.code ? `, ${v.result.reason.code}` : ''}, ${day(v.created_at)}`, 'The automated check failed for a system reason. Submit the certificate again with hb_verify_certificate, or contact support with the verification id and request_id.', { status: 'failed', sort: '-created_at' });
+        pending('training-verification (stuck pending)', 'training-verification.verifications.list', 'certificate verification(s) still pending after an hour', (v) => v.status === 'pending' && Date.now() - Date.parse(String(v.created_at)) > PENDING_STUCK_MS,
+          (v) => `#${v.id} ${v.candidate_name ?? '-'} (${v.request_type}): pending since ${when(v.created_at)}`, 'A verification normally starts within minutes. Check it with hb_verification_status; if it stays pending, cancel it (hb_change_booking, portal training-verification, refunded) and submit again, or contact support.', { status: 'pending', sort: 'created_at' });
         pending('registration-monitoring', 'registration-monitoring.alerts.list', 'unacknowledged registration alert(s)', (x) => x.acknowledged === false,
           (x) => `#${x.id} [${x.severity}] ${x.type_label ?? x.type}: ${x.worker?.name ?? 'worker'} (${day(x.created_at)})`, 'Review and acknowledge each alert.', { acknowledged: 'false', sort: '-severity' });
         pending('dbs-rtw', 'dbs-rtw.alerts.list', 'unacknowledged DBS or right to work alert(s)', (x) => x.acknowledged === false,
@@ -615,6 +632,20 @@ export function goLiveCheckTool(ctx: AppContext): TaskTool {
 
         add('NOTE', 'IP allowlist: the API does not show it. Check it on the Developer page. With the stdio transport, calls leave from the machine running this server, so that machine\'s public IP is what the allowlist sees.');
 
+        const tvScopes = scopes.filter((s) => s.startsWith('training-verification:'));
+        if (key && (a.data.portals?.includes('training-verification') || tvScopes.length)) {
+          const canWrite = scopes.includes('*') || tvScopes.some((s) => s === 'training-verification:write' || s === 'training-verification:*');
+          add(canWrite ? 'OK' : 'NOTE', canWrite ? 'Training Verification: the key can submit and cancel certificate verifications (training-verification:write, which also reads).' : 'Training Verification: the key can only read. Submitting or cancelling a verification needs training-verification:write.');
+          add('NOTE', 'Training Verification pricing: Automated is free for a regular account (one that also uses other Hub services) and charged for a verification-only account; Manual is charged for every account; only credits and the wallet pay (no card), and a shortfall is 402 insufficient_credits, so check the balance before going live. Webhooks: training-verification.submitted, .processing, .verified, .not_found, .rejected, .failed and .refunded, each once per verification.');
+          if (run.blocker('training-verification.pricing.show') === undefined) {
+            const price = await run.get('training-verification.pricing.show', {});
+            if (price.ok) {
+              const prices: Json[] = price.data?.prices ?? price.data?.request_types ?? [];
+              add('NOTE', `Training Verification prices for this account (${price.data?.client_type ?? 'unknown'} account): ${Array.isArray(prices) && prices.length ? prices.map((p) => `${p.request_type} ${p.free ? 'free' : `${money(p.gross_pence, p.currency)} incl. VAT`}`).join(', ') : 'not listed'}.`);
+            } else add('WARN', `Training Verification pricing could not be read (${why(price)}).`);
+          }
+        }
+
         const hooks = await run.get('webhooks.endpoints.list', { query: { per_page: 100 } });
         let endpoints: Json[] = [];
         if (hooks.ok) {
@@ -641,7 +672,7 @@ export function goLiveCheckTool(ctx: AppContext): TaskTool {
           'Handle errors by code; retry only network failures, 429 after Retry-After and 5xx with backoff (step 7).',
           'Know the key\'s hourly limit (1,000 calls by default) and prefer webhooks to polling (step 8).',
           'Log request_id on every error and alert on rising 401/403/5xx, any 429 and failing webhooks (step 9).',
-          'If you touch occupational health, clinical or reference data, check your own data protection handling (step 10; hb://guides/health-data-and-privacy).',
+          'If you touch occupational health, clinical, reference or training certificate data (a Training Verification certificate carries the candidate\'s name and training record), check your own data protection handling (step 10; hb://guides/health-data-and-privacy).',
           'Decide who may create and rotate keys (the Developer role) and how to rotate a key and a secret without downtime (step 11).',
           'Full checklist: hb://guides/going-live.',
         ];

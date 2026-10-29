@@ -28,6 +28,7 @@ Environment
   HB_MAX_RESPONSE_CHARS   cap on a tool answer, default 60000
   HB_REQUEST_TIMEOUT_MS   default 30000
   HB_WEBHOOK_SECRET       default secret for hb_verify_webhook_signature
+  HB_UPLOAD_DIRS          comma list of absolute directories hb_verify_certificate may read certificate files from (default: the working directory only)
   HB_MCP_HTTP_TOKEN       bearer token required by --http when not on loopback
   HB_MCP_HTTP_PORT, HB_MCP_HTTP_HOST   defaults for --http
 
