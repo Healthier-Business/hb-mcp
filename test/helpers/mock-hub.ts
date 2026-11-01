@@ -188,6 +188,16 @@ export class MockHub {
     await new Promise<void>((r) => this.server.close(() => r()));
   }
 
+  /** Portal key to the `api_access_*` code that portal's calls are refused with (a live client without approval). */
+  approvalRefusals = new Map<string, string>();
+
+  /** What `GET /account/api-access` answers. The default is a sandbox: everything open. */
+  apiAccessRows: { area: string; label: string; sensitive: boolean; status: string; decided_at: string | null }[] = [
+    { area: 'occupational-health', label: 'Occupational Health', sensitive: true, status: 'not_required', decided_at: null },
+    { area: 'dbs-rtw', label: 'DBS & Right To Work', sensitive: true, status: 'not_required', decided_at: null },
+    { area: 'online-training', label: 'Online Training', sensitive: false, status: 'not_required', decided_at: null },
+  ];
+
   /** Make the next request matching `when` fail with this answer. */
   failNext(status: number, body: unknown, headers: Record<string, string> = {}, when: Queued['when'] = () => true): void {
     this.queue.push({ when, status, body, headers });
@@ -375,8 +385,8 @@ export class MockHub {
       res.writeHead(status, { 'Content-Type': ctype, 'X-Request-Id': 'req_' + this.requests.length, ...headers });
       res.end(typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body));
     };
-    const err = (status: number, code: string, message: string, details?: unknown, headers: Record<string, string> = {}) =>
-      send(status, { error: code, message, ...(details ? { details } : {}), request_id: 'req_' + this.requests.length }, headers);
+    const err = (status: number, code: string, message: string, details?: unknown, headers: Record<string, string> = {}, extra: Record<string, unknown> = {}) =>
+      send(status, { error: code, message, ...(details ? { details } : {}), ...extra, request_id: 'req_' + this.requests.length }, headers);
 
     const qi = this.queue.findIndex((q) => q.when(rec));
     if (qi >= 0) {
@@ -421,6 +431,14 @@ export class MockHub {
       if (!ok) return err(403, 'insufficient_scope', `The key needs the scope ${needed}.`, undefined, rl);
     }
 
+    const portalOfPath = /^\/api\/v2\/([a-z-]+)\//.exec(rec.path)?.[1];
+    const refusedWith = portalOfPath ? this.approvalRefusals.get(portalOfPath) : undefined;
+    if (refusedWith) {
+      return err(403, refusedWith, `Access to ${portalOfPath} is not open.`, undefined, rl, { areas: [portalOfPath], docs_url: 'https://dev.hbcompliance.co.uk/docs/api-access-approval' });
+    }
+    if (rec.path === '/api/v2/account/api-access' && rec.method === 'GET') {
+      return send(200, { data: this.apiAccessRows }, rl);
+    }
     if (rec.path === '/api/v2/auth/me') {
       return send(200, { client_id: 1001, key: { name: 'Mock key', prefix: MOCK_KEY.slice(0, 8), scopes: this.scopes, expires_at: null } }, rl);
     }

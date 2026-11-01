@@ -1,3 +1,4 @@
+import { approvalGuidance, isApprovalCode } from './approval.js';
 import { redactor } from './redact.js';
 
 export interface RateLimitInfo {
@@ -16,9 +17,18 @@ export class HubApiError extends Error {
     readonly requestId: string | undefined,
     readonly retryAfterSeconds: number | undefined,
     readonly rateLimit: RateLimitInfo = {},
+    /** Extra fields of an approval refusal (`areas`, `docs_url`, `events`); empty for every other error. */
+    readonly approval: ApprovalDetails = {},
   ) {
     super(message);
   }
+}
+
+/** The extra fields the Hub adds to `api_access_*` and `webhook_events_not_approved` answers. */
+export interface ApprovalDetails {
+  areas?: string[];
+  events?: string[];
+  docsUrl?: string;
 }
 
 /** The request could not be completed (no answer, timeout). For writes the outcome is unknown. */
@@ -59,7 +69,7 @@ const GUIDANCE: Record<number, string> = {
   400: 'The body was not valid JSON. Check the body object and try again.',
   401: 'The token was refused even after a refresh. Check that HB_API_KEY is current (it may have been regenerated or deleted).',
   402: 'The account does not have enough credits or balance. Credits are units; money is integer pence with a currency. Do not retry: ask the user to top up in the Hub (or use another pay_option if the operation offers one).',
-  403: 'The key may not do this. Read the code: insufficient_scope (add the named scope to the key in the Hub Developer page), portal_unavailable (the account does not use this portal), key_inactive (key switched off or expired), ip_not_allowed (see the IP hint).',
+  403: 'The key may not do this. Read the code: insufficient_scope (add the named scope to the key in the Hub Developer page), portal_unavailable (the account does not use this portal), key_inactive (key switched off or expired), ip_not_allowed (see the IP hint), api_access_not_approved, api_access_pending, api_access_rejected or api_access_revoked (the area needs the Hub\'s manual approval: Developer > API access), webhook_events_not_approved (the endpoint asks for events of an area that is not approved).',
   404: 'Not found. Check the id or candidate_ref (it must be a candidate_ref uuid, not an internal id) and that you are in the right environment: sandbox ids mean nothing in live.',
   409: 'Conflict with current state (a taken slot, an existing hold, or an Idempotency-Key reused with a different body). Re-read the current state before trying again; do not repeat the same write blindly.',
   413: 'The upload or body is too large. Reduce it.',
@@ -77,6 +87,11 @@ const CODE_GUIDANCE: Record<string, string> = {
   key_inactive: 'The key is switched off or has expired. Ask the user to switch it on or create a new one in the Hub, then restart the server with the new HB_API_KEY.',
   portal_unavailable: 'The account does not use this portal, so its endpoints answer 403. Choose an endpoint of a portal the account has.',
   insufficient_credits: 'Not enough credits or balance. Nothing was charged. Ask the user to top up, or choose a different pay_option if the operation supports one.',
+  api_access_not_approved: 'Do not retry and do not try other endpoints to work around it. Tell the user in plain words that this area needs a one-off approval, requested in the Hub by a user of their organisation under Developer > API access. Their live key keeps working for every other area. The sandbox is always open. Run hb_status to see the approval state of each sensitive area.',
+  api_access_pending: 'Do not retry: it is waiting for review by Hub staff and the user will be emailed the decision. Tell the user in plain words. Other areas work. Run hb_status to check again later, not in a loop.',
+  api_access_rejected: 'Do not retry. Tell the user the request was not approved; the reason is in the Hub under Developer > API access, where they can send a new request. It is not in the API.',
+  api_access_revoked: 'Do not retry. Tell the user Hub staff withdrew the approval; the reason is in the Hub under Developer > API access, where they can send a new request. Events of that area are paused too.',
+  webhook_events_not_approved: 'Nothing was saved. Remove the events named above from the endpoint (events of other areas are fine), or get the area approved first in the Hub under Developer > API access. Use hb_status to see the state of each sensitive area.',
   idempotency_conflict: 'The same Idempotency-Key was used earlier with a different body. Use a new key for a different request, or resend exactly the original body to get the first answer.',
   invalid_credentials: 'HB_API_KEY is wrong, deleted or regenerated. Ask the user to check the key; do not retry.',
   validation_failed: 'Fix the fields named in `details` and call again. Nothing was changed.',
@@ -99,6 +114,9 @@ export function describeError(e: unknown): string {
     }
     if (e.rateLimit.remaining !== undefined) {
       lines.push(`rate_limit: ${e.rateLimit.remaining}/${e.rateLimit.limit ?? '?'} remaining`);
+    }
+    if (isApprovalCode(e.code)) {
+      lines.push(approvalGuidance(e.code, e.approval));
     }
     lines.push(`What to do next: ${CODE_GUIDANCE[e.code] ?? GUIDANCE[e.status] ?? 'Read the message and the operation description before trying again.'}`);
     return redactor.redact(lines.join('\n'));

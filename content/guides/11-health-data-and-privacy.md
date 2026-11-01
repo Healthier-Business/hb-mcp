@@ -6,7 +6,7 @@ It describes what the API does. It is not legal advice. Your own obligations dep
 
 ## Which scopes open sensitive data
 
-Treat the scopes below as the sensitive ones. Give them only to keys whose integration really needs them, and keep those keys apart from your general-purpose keys. [Scopes and permissions](04-scopes-and-permissions.md) explains how to choose scopes.
+Occupational Health and DBS & Right To Work also need a one-off manual approval of your organisation before their API calls work and their webhook events are sent: see [API access approval](16-api-access-approval.md). Treat the scopes below as the sensitive ones. Give them only to keys whose integration really needs them, and keep those keys apart from your general-purpose keys. [Scopes and permissions](04-scopes-and-permissions.md) explains how to choose scopes.
 
 | Portal | Scope | What it opens |
 | --- | --- | --- |

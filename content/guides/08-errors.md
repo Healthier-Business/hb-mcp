@@ -59,6 +59,8 @@ This table covers every code the API can return. Codes in the first group can co
 | 403 | `key_inactive` | The key has been switched off or has expired | Switch it on or create a new key on the Developer page |
 | 403 | `ip_not_allowed` | The key has an IP allowlist and your address is not on it | Fix the allowlist or the calling address. See [IP allowlisting](05-ip-allowlisting.md) |
 | 403 | `portal_unavailable` | Your account does not use the portal in the path | Ask to have the portal enabled. A scope will not fix this |
+| 403 | `api_access_not_approved`, `api_access_pending`, `api_access_rejected`, `api_access_revoked` | The key holds a scope of an area that needs manual approval (by default Occupational Health and DBS & Right To Work) and your organisation has not been approved. The body adds `areas` and `docs_url` | Request or follow up the approval in the Hub under API access. Do not retry. See [API access approval](16-api-access-approval.md) |
+| 403 | `webhook_events_not_approved` | A webhook endpoint subscribes to events of an area that needs approval you do not hold. The body adds `areas` and `events` | Remove those events, or get the area approved first. See [API access approval](16-api-access-approval.md) |
 | 403 | `insufficient_scope` | The key lacks the scope the endpoint needs. The message names it | Add the scope to the key. See [scopes](04-scopes-and-permissions.md) |
 | 403 | `forbidden` | The action is not allowed for another reason | Read the message. Do not retry |
 | 404 | `not_found` | The route, record or candidate does not exist, or belongs to another client. These cases are deliberately indistinguishable | Check the id or `candidate_ref` and the key |

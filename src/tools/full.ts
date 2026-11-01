@@ -1,3 +1,4 @@
+import { approvalNote } from '../approval.js';
 import type { CatalogueOperation } from '../catalogue.js';
 import type { JsonObject } from '../generator/build.js';
 import type { AppContext } from '../context.js';
@@ -71,6 +72,7 @@ export function toolDescription(ctx: AppContext, op: CatalogueOperation): string
     `${modeBadge(ctx.config)} ${op.summary}.`,
     writeNote(ctx.config, op),
     op.scope ? `Scope: ${op.scope}.` : '',
+    approvalNote([op.toolset]),
     op.credits ? `Credits: ${trimDescription(op.credits.description, 220)}` : '',
     trimDescription(op.description, 700),
   ];

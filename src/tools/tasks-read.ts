@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { APPROVAL_PLACE, areaLabel } from '../approval.js';
 import { TOOLSETS } from '../config.js';
 import type { AppContext } from '../context.js';
 import {
@@ -646,6 +647,19 @@ export function goLiveCheckTool(ctx: AppContext): TaskTool {
           }
         }
 
+        if (key) {
+          const access = await run.get('account.api-access.show', {});
+          if (access.ok) {
+            const covers = (p: string) => scopes.includes('*') || scopes.some((x) => x.startsWith(`${p}:`)) || (a.data.portals ?? []).includes(p as (typeof TOOLSETS)[number]);
+            for (const row of rows(access).filter((r) => r.sensitive === true && typeof r.area === 'string')) {
+              const name = String(row.label ?? areaLabel(row.area));
+              if (row.status === 'approved') add('OK', `${name}: approved by Hub staff${row.decided_at ? ` (${day(row.decided_at)})` : ''}, so calls and webhook events work.`);
+              else if (row.status === 'not_required') add('NOTE', `${name}: no approval needed (the sandbox is always open).`);
+              else add(covers(row.area) ? 'FAIL' : 'NOTE', `${name} needs approval ${APPROVAL_PLACE}; status: ${String(row.status).replace('_', ' ')}.${covers(row.area) ? ' The key\'s calls to it, and its webhook events, are refused until it is approved (403 api_access_*).' : ' The key has no scope for it, so this only matters if you add one.'}`);
+            }
+          } else add('WARN', `Approval state of the sensitive areas was not checked (${why(access)}).`);
+        }
+
         const hooks = await run.get('webhooks.endpoints.list', { query: { per_page: 100 } });
         let endpoints: Json[] = [];
         if (hooks.ok) {
@@ -668,6 +682,7 @@ export function goLiveCheckTool(ctx: AppContext): TaskTool {
         const remaining = [
           'Store the live key in a secret store or server environment variable, never in code or logs (guide step 3).',
           'Register the live webhook endpoint, keep its new signing secret, verify signatures on the raw body, answer 2xx quickly, dedupe on the event id, and send a test event (step 5; hb_setup_sandbox_webhook does this in a sandbox only).',
+          'If you use Occupational Health or DBS & Right To Work (by default the areas that need manual approval), have a user of the organisation request approval in the Hub under Developer > API access before go-live, and create webhook endpoints for them only once approved (hb://guides/api-access-approval).',
           'Send an Idempotency-Key on every create and reuse it on retry (step 6).',
           'Handle errors by code; retry only network failures, 429 after Retry-After and 5xx with backoff (step 7).',
           'Know the key\'s hourly limit (1,000 calls by default) and prefer webhooks to polling (step 8).',

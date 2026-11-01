@@ -248,6 +248,15 @@ With the current API none of these print a deprecation warning, because nothing 
 
 ## Changelog
 
+### API access approval, November 2026 (additive for approved clients)
+
+Occupational Health and DBS & Right To Work (the two areas that hold health and criminal record information) now need a one-off manual approval of your organisation before their API calls work and before their webhook events are sent. Hub staff choose which areas need approval, so the list can change. Read [API access approval](16-api-access-approval.md) first.
+
+* **New endpoint.** `GET /account/api-access` (`account.api-access.show`): every area with `sensitive`, `status` and `decided_at`. Any valid key, no scope.
+* **New error codes** (all `403`, with extra fields `areas` and `docs_url`): `api_access_not_approved`, `api_access_pending`, `api_access_rejected`, `api_access_revoked`; and `webhook_events_not_approved` on creating or updating a webhook endpoint (extra fields `areas` and `events`).
+* **Webhooks.** Events of an area without an active approval are not sent and not retried; withdrawing an approval pauses delivery and keeps the endpoints.
+* **Keys.** A key can still be created with these scopes before approval; its calls are refused until the area is approved.
+
 ### Training Verification, October 2026 (additive)
 
 A tenth portal, `training-verification`, is added under `/api/v2` (11 operations, 7 webhook events). The specification now describes 200 operations and 66 webhook events; nothing existing changed and every existing operation id is the same. The portal is described on its [page](../portals/training-verification.md).

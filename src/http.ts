@@ -1,3 +1,4 @@
+import { approvalDetailsFrom } from './approval.js';
 import { HubApiError, HubNetworkError, type RateLimitInfo } from './errors.js';
 import { log } from './log.js';
 import { isFileValue } from './schema.js';
@@ -139,6 +140,7 @@ export class HubClient {
         typeof errorBody.request_id === 'string' ? errorBody.request_id : meta.requestId,
         meta.retryAfter,
         meta.rateLimit,
+        approvalDetailsFrom(errorBody),
       );
     }
   }

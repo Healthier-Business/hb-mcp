@@ -1,3 +1,4 @@
+import { isApprovalCode } from '../approval.js';
 import type { CatalogueOperation } from '../catalogue.js';
 import { writesEnabled } from '../config.js';
 import { scopeAllowed, type AppContext } from '../context.js';
@@ -131,13 +132,14 @@ export function why(r: CallOutcome): string {
   if (r.skipped) return r.skipped;
   if (r.code === 'insufficient_scope') return 'the key lacks the needed scope';
   if (r.code === 'portal_unavailable') return 'the account does not use this portal';
+  if (r.code && isApprovalCode(r.code)) return 'the area needs approval in the Hub under Developer > API access (run hb_status)';
   if (r.status === 404) return 'not found';
   const first = (r.error ?? 'failed').split('\n')[0] ?? 'failed';
   return first.length > 160 ? first.slice(0, 160) + '…' : first;
 }
 
 export function isUnavailable(r: CallOutcome): boolean {
-  return r.code === 'portal_unavailable' || r.code === 'insufficient_scope' || r.skipped !== undefined;
+  return r.code === 'portal_unavailable' || r.code === 'insufficient_scope' || (r.code !== undefined && isApprovalCode(r.code)) || r.skipped !== undefined;
 }
 
 export interface TaskReport {

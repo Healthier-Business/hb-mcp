@@ -1,3 +1,4 @@
+import { approvalNote } from '../approval.js';
 import type { AppContext } from '../context.js';
 import { isTaskAvailable } from './task-support.js';
 import { READ_TASKS } from './tasks-read.js';
@@ -70,9 +71,31 @@ const MORE_WRITE_TASKS = [
   chaseOutstandingTool, verifyWorkerTool, acknowledgeAlertsTool, bulkImportWorkersTool, redeliverWebhooksTool, rotateWebhookSecretTool, verifyCertificateTool,
 ];
 
+/** Task tools that call an area that needs the Hub's manual approval for live use, and which areas (toolsets). */
+const APPROVAL_AREAS: Record<string, string[]> = {
+  hb_request_occupational_health: ['occupational-health'],
+  hb_candidate_overview: ['occupational-health'],
+  hb_account_summary: ['occupational-health', 'dbs-rtw'],
+  hb_needs_attention: ['occupational-health', 'dbs-rtw'],
+  hb_go_live_check: ['occupational-health', 'dbs-rtw'],
+  hb_chase_outstanding: ['occupational-health'],
+  hb_credits: ['occupational-health'],
+  hb_get_report: ['occupational-health'],
+  hb_monitoring_alerts: ['occupational-health', 'dbs-rtw'],
+  hb_acknowledge_alerts: ['occupational-health', 'dbs-rtw'],
+  hb_verify_worker: ['dbs-rtw'],
+  hb_worker_status: ['dbs-rtw'],
+  hb_billing_summary: ['dbs-rtw'],
+  hb_bulk_import_workers: ['dbs-rtw'],
+};
+
 /** Every task tool, whether or not it is offered with this configuration (tests use this to reach hidden ones). */
 export function allTaskTools(ctx: AppContext) {
-  return [...READ_TASKS, ...READ_TASKS_MORE, verificationStatusTool, ...WRITE_TASKS, ...MORE_WRITE_TASKS].map((make) => make(ctx));
+  return [...READ_TASKS, ...READ_TASKS_MORE, verificationStatusTool, ...WRITE_TASKS, ...MORE_WRITE_TASKS].map((make) => {
+    const task = make(ctx);
+    const note = approvalNote(APPROVAL_AREAS[task.definition.name] ?? []);
+    return note ? { ...task, definition: { ...task.definition, description: `${task.definition.description} ${note}` } } : task;
+  });
 }
 
 /**

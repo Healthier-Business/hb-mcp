@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { approvalNote } from '../approval.js';
 import type { CatalogueOperation } from '../catalogue.js';
 import { writesEnabled } from '../config.js';
 import { scopeAllowed, type AppContext } from '../context.js';
@@ -43,6 +44,7 @@ export function summariseOperation(ctx: AppContext, op: CatalogueOperation) {
     credits: op.credits ? true : undefined,
     health_data: op.healthData || undefined,
     destructive: op.destructive || undefined,
+    live_needs_approval: approvalNote([op.toolset]) ? true : undefined,
     paginated: op.paginated || undefined,
     callable_now: allowed,
     why_not: allowed ? undefined : op.internal ? 'handled by the server itself' : !ctx.config.toolsets.includes(op.toolset) ? 'toolset disabled' : 'writes are disabled (read-only)',
@@ -67,6 +69,7 @@ export function describeOperation(ctx: AppContext, op: CatalogueOperation) {
   return {
     ...summariseOperation(ctx, op),
     environment: ctx.config.mode,
+    approval: approvalNote([op.toolset]) || undefined,
     description: op.description.length > 9000 ? op.description.slice(0, 9000) + '…' : op.description,
     parameters: op.parameters.map((p) => ({ name: p.name, in: p.in, required: p.required, description: p.description, schema: p.schema })),
     body: op.body

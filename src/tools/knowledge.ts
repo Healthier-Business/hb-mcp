@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 import { redactor } from '../redact.js';
 import { SERVER_VERSION, type AppContext, scopeAllowed } from '../context.js';
+import { APPROVAL_PLACE, areaLabel } from '../approval.js';
 import { describeError } from '../errors.js';
 import { writesEnabled } from '../config.js';
 import { searchGuides } from '../guides.js';
@@ -37,11 +38,57 @@ export function verifyWebhook(opts: { secret: string; timestamp: string; body: s
   };
 }
 
+interface ApiAccessRow {
+  area?: string;
+  label?: string;
+  sensitive?: boolean;
+  status?: string;
+  decided_at?: string | null;
+}
+
+const APPROVAL_STATUS_TEXT: Record<string, string> = {
+  not_required: 'open, no approval needed',
+  not_requested: 'needs approval and nobody has asked yet',
+  pending: 'a request is waiting for review',
+  approved: 'approved: calls and webhook events work',
+  rejected: 'the last request was not approved',
+  revoked: 'approval was withdrawn',
+};
+
+/** Add the approval state of every sensitive area (GET /account/api-access, any valid key, no scope). Never fails hb_status. */
+async function addApiAccess(ctx: AppContext, status: Record<string, unknown>, warnings: string[]): Promise<void> {
+  try {
+    const res = await ctx.client.send({ method: 'GET', path: '/api/v2/account/api-access', pathTemplate: '/api/v2/account/api-access', retryable: true });
+    const rows = ((res.json as { data?: ApiAccessRow[] } | null)?.data ?? []).filter((r) => r && typeof r.area === 'string');
+    const sensitive = rows.filter((r) => r.sensitive === true);
+    if (!sensitive.length) {
+      status.api_access = { note: 'No area needs manual approval.' };
+      return;
+    }
+    status.api_access = {
+      note: `Areas that need the Hub's one-off approval (${APPROVAL_PLACE}); live only, the sandbox is always open. Calls and webhook events of an area work only when it is approved or not_required. Staff choose the list, so do not assume it.`,
+      areas: sensitive.map((r) => ({
+        area: r.area,
+        label: r.label ?? areaLabel(r.area as string),
+        status: r.status,
+        meaning: APPROVAL_STATUS_TEXT[String(r.status)] ?? undefined,
+        decided_at: r.decided_at ?? null,
+      })),
+    };
+    for (const r of sensitive) {
+      if (r.status === 'approved' || r.status === 'not_required') continue;
+      warnings.push(`${r.label ?? areaLabel(r.area as string)} needs approval ${APPROVAL_PLACE}; status: ${String(r.status).replace('_', ' ')}. Live calls and webhook events of this area are refused until it is approved.`);
+    }
+  } catch (e) {
+    status.api_access = { available: false, problem: 'Could not read the approval state (GET /account/api-access). An older Hub does not have it. ' + describeError(e).split('\n')[0] };
+  }
+}
+
 export function statusTool(ctx: AppContext): ToolDefinition {
   return {
     name: 'hb_status',
     description:
-      'Who am I and what may I do? Calls GET /auth/me and reports: environment (live or sandbox), base URL, key name and prefix, the key\'s scopes, whether writes are enabled, the toolsets, and the last-seen rate limit. Never reveals a key or token. Call this first.',
+      'Who am I and what may I do? Calls GET /auth/me and reports: environment (live or sandbox), base URL, key name and prefix, the key\'s scopes, whether writes are enabled, the toolsets, the approval state of each sensitive area (Occupational Health and DBS & Right To Work need the Hub\'s one-off approval for live use; GET /account/api-access, any key), and the last-seen rate limit. Never reveals a key or token. Call this first.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     annotations: { title: 'Hub status', ...READ_ONLY, openWorldHint: true },
     handler: async () => {
@@ -86,6 +133,7 @@ export function statusTool(ctx: AppContext): ToolDefinition {
           if (!me.key?.prefix?.startsWith('hbk_test_') && c.mode === 'sandbox') {
             warnings.push('A non-test key is being sent to a URL treated as sandbox. Check HB_BASE_URL and HB_ENV.');
           }
+          await addApiAccess(ctx, status, warnings);
         } catch (e) {
           status.auth = { configured: true, ok: false, problem: describeError(e) };
         }

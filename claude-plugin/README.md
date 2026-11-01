@@ -5,7 +5,7 @@ This plugin lets Claude use the Healthier Business Hub API v2: look up candidate
 ## What it contains
 
 - **An MCP server**, `hb-hub`, started with `npx` from the public npm package [`@healthier-business/hub-mcp`](https://www.npmjs.com/package/@healthier-business/hub-mcp). It runs the latest published version (`npx -y`). The source is public at [github.com/Healthier-Business/hb-mcp](https://github.com/Healthier-Business/hb-mcp).
-- **Skills**: `hub-safe-workflow` (how Claude should use the Hub tools safely, preferring the task tools such as `hb_find_candidate` and `hb_candidate_overview` for common jobs), `/hb-hub:status` (which environment, key and scopes are in use) and `/hb-hub:sandbox-test` (try a workflow in a sandbox before going live).
+- **Skills**: `hub-safe-workflow` (how Claude should use the Hub tools safely, preferring the task tools such as `hb_find_candidate` and `hb_candidate_overview` for common jobs), `/hb-hub:status` (which environment, key and scopes are in use, and whether Occupational Health and DBS & Right To Work are approved for live use) and `/hb-hub:sandbox-test` (try a workflow in a sandbox before going live).
 
 ## What it does with your data
 
@@ -24,6 +24,10 @@ In Claude Code:
 ```
 
 Claude Code asks for your sandbox API key (it starts with `hbk_test_`) and your sandbox base URL. Both come from your sandbox in the Healthier Business developer portal. Change them later with `/plugin configure hb-hub@healthier-business`. Then run `/hb-hub:status`.
+
+## Approval for sensitive areas
+
+With a live key, Occupational Health and DBS & Right To Work (by default) need a one-off approval of your organisation by the Hub team before Claude can use them. Ask for it in the Hub under Developer > API access. `/hb-hub:status` shows the state of each area, and a refused call is explained in plain words, with a link to the guide. A sandbox is always open.
 
 ## Settings
 

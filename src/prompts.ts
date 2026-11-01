@@ -117,7 +117,7 @@ export function buildPrompts(ctx: AppContext): PromptDefinition[] {
           '1. Everything worked in a sandbox: list the flows tested and the error cases (402, 403, 404, 409, 422, 429) handled.',
           '2. A new LIVE key exists with only the scopes the integration needs (least privilege), and an IP allowlist if appropriate. With the stdio transport the calls leave from the developer\'s own machine, so that machine\'s public IP is what the allowlist sees.',
           '3. Switch the server: HB_BASE_URL (or remove it for the default https://hub.hbcompliance.co.uk), HB_API_KEY = the live key, restart the client. Keep HB_READ_ONLY=true until the owner is ready; live writes also need HB_ALLOW_LIVE_WRITES=true and confirm=true per write.',
-          '4. Run hb_status and confirm environment LIVE and the expected scopes.',
+          '4. Run hb_status and confirm environment LIVE and the expected scopes. Check api_access too: Occupational Health and DBS & Right To Work (by default) need the Hub\'s one-off approval before live calls and webhook events work; a user of the organisation asks in the Hub under Developer > API access, and a refused area answers 403 api_access_*.',
           '5. Webhooks: register the endpoint again in live (new signing secret), verify signatures, dedupe on X-Hub-Event-Id.',
           '6. Identifiers: sandbox candidate_refs and ids mean nothing in live. Look up or create real candidates; never copy ids across.',
           '7. Rate limits and idempotency: 1,000 calls an hour per key by default; writes carry Idempotency-Key; no blind retries of writes.',

@@ -104,6 +104,17 @@ HB_READ_ONLY = "true"
 
 stdio: command `npx`, args `-y @healthier-business/hub-mcp`, environment as in the table below. HTTP: `hb-hub-mcp --http --port 3333` serves Streamable HTTP at `http://127.0.0.1:3333/mcp`.
 
+### Approval for sensitive areas
+
+Occupational Health and DBS & Right To Work (by default; Hub staff choose the list) hold health and criminal record information. With a **live** key their API calls, and the webhook events of the same area, work only after Hub staff have approved your organisation. A user of your organisation asks for it once in the Hub under **Developer > API access** and is emailed the decision. A sandbox is always open, so nothing changes there.
+
+- **See where you stand.** `hb_status` lists each sensitive area with its state (`approved`, `pending`, `not_requested`, `rejected`, `revoked`, or `not_required` in a sandbox) and warns for the ones the key cannot use yet. The operation behind it, `account.api-access.show` (`GET /api/v2/account/api-access`), is read-only, needs no scope and works with any valid key, in compact mode through `hb_call_operation` and in full mode as the tool `account_api_access_show`. `hb_go_live_check` fails for a sensitive area the key has a scope for that is not approved.
+- **Refusals are explained.** A live call to an area without approval answers `403` with `api_access_not_approved`, `api_access_pending`, `api_access_rejected` or `api_access_revoked`, and creating a webhook endpoint with events of such an area answers `webhook_events_not_approved`. The server turns these into plain words for the assistant, for example: "Occupational Health needs approval in the Hub under Developer > API access; status: pending", with the docs link and "do not retry". They are never retried.
+- **Descriptions say so.** The tool and operation descriptions of Occupational Health and DBS & Right To Work, and of the task tools that use them, state that live use needs approval.
+- **Before approval.** A key can hold the scopes of these areas before approval; its calls to other areas work as normal. Events of an area are not sent, queued or replayed while it is not approved: fetch what you missed through the API.
+
+Read the guide with `hb://guides/api-access-approval`.
+
 ### Then go live
 
 When it works in the sandbox, follow the `go-live-checklist` prompt (or `hb://guides/going-live`): create a **live key with least-privilege scopes**, point `HB_BASE_URL` at `https://hub.hbcompliance.co.uk` (or remove it), run `--doctor`, and keep `HB_READ_ONLY=true` until the owner is ready for live writes.
@@ -116,14 +127,14 @@ MCP clients degrade or cap beyond about 40 tools, so the default is a handful of
 
 | Tool | What it does |
 | --- | --- |
-| `hb_status` | Who am I: environment (live/sandbox), base URL, key name and prefix, scopes, whether writes are enabled, last rate limit. |
+| `hb_status` | Who am I: environment (live/sandbox), base URL, key name and prefix, scopes, whether writes are enabled, last rate limit, and the approval state of each sensitive area (see [Approval for sensitive areas](#approval-for-sensitive-areas)). |
 | `hb_search_operations` | Search the operations by text, toolset (portal), method or scope. Says which are callable now and which the key's scopes allow. |
 | `hb_describe_operation` | Full detail: parameters, body schema with required fields and example, scope, credits, health data, errors, idempotency, a ready example call. |
 | `hb_call_operation` | Call any operation by id with `path_params`, `query`, `body`, `headers`. Validates against the spec first, adds `Idempotency-Key`, `all_pages` (capped), `fields` select, `confirm` for live writes. |
 | `hb_list_events` | The 73 webhook events (filter by portal or text). |
 | `hb_describe_event` | One event: payload schema, sample, delivery headers, verification rule. |
 | `hb_verify_webhook_signature` | Local, no network: verify or compute `sha256=` HMAC of `{timestamp}.{body}` with the 300 second window. |
-| `hb_search_guides` | Local, no network, no key needed: keyword search over the 36 bundled guides (15 API, 21 developer portal); returns the best matches with a snippet and the `hb://guides/<name>` to read. Useful for clients that do not browse resources. |
+| `hb_search_guides` | Local, no network, no key needed: keyword search over the 37 bundled guides (16 API, 21 developer portal); returns the best matches with a snippet and the `hb://guides/<name>` to read. Useful for clients that do not browse resources. |
 
 ### Task tools (compact and full mode)
 
@@ -202,13 +213,13 @@ The three credential operations (`auth.token.create`, `auth.refresh.create`, `au
 
 ### Resources and prompts
 
-Resources: `hb://guides/<name>` (the 15 API developer guides and 21 developer portal guides, 36 in all; API guides: `authentication`, `errors`, `scopes-and-permissions`, `idempotency`, `webhooks`, `going-live`, ...), `hb://portals/<toolset>`, `hb://spec/overview`, and templates `hb://spec/operations/{id}`, `hb://spec/events/{type}`.
+Resources: `hb://guides/<name>` (the 16 API developer guides and 21 developer portal guides, 37 in all; API guides: `authentication`, `errors`, `scopes-and-permissions`, `idempotency`, `webhooks`, `going-live`, ...), `hb://portals/<toolset>`, `hb://spec/overview`, and templates `hb://spec/operations/{id}`, `hb://spec/events/{type}`.
 
 Prompts: `get-started-in-sandbox` (sign up, sandbox, key, `--doctor`, first read), `book-practical-training`, `check-candidate-compliance`, `webhook-sandbox-setup`, `go-live-checklist`, `onboard-candidate`, `verify-a-certificate` (price and balance check, file check, submit, follow the status and the webhook).
 
 ### Developer portal guides
 
-The developer portal is where a developer signs up, makes sandboxes, test keys and webhooks, and uses the API Playground. Its 21 usage guides are bundled as resources `hb://guides/portal-<name>` (source files in `content/guides/portal/`), listed after the 15 API guides, so an assistant can explain the portal as well as the API. When no key is configured the server instructions, `hb_status` and the missing-key error point to the first three.
+The developer portal is where a developer signs up, makes sandboxes, test keys and webhooks, and uses the API Playground. Its 21 usage guides are bundled as resources `hb://guides/portal-<name>` (source files in `content/guides/portal/`), listed after the 16 API guides, so an assistant can explain the portal as well as the API. When no key is configured the server instructions, `hb_status` and the missing-key error point to the first three.
 
 | Resource | What it covers |
 | --- | --- |
@@ -290,6 +301,8 @@ With the default **stdio** transport the server runs on the developer's own mach
 | `403 insufficient_scope` | Add the named scope to the key on the Developer page (`:write` also grants `:read`). `hb_status` lists the key's scopes. |
 | `403 ip_not_allowed` | The machine running the server is not on the key's allowlist (see the egress note). |
 | `403 portal_unavailable` | The account does not use that portal. |
+| `403 api_access_not_approved`, `api_access_pending`, `api_access_rejected`, `api_access_revoked` | A live key called Occupational Health or DBS & Right To Work and the organisation is not approved for it. A user of the organisation asks in the Hub under Developer > API access. `hb_status` shows the state per area. Not retried. |
+| `403 webhook_events_not_approved` | A webhook endpoint asked for events of an area that is not approved. Remove those events or get the area approved first. |
 | `404` on a candidate | Use a real `candidate_ref` uuid from `hub.candidates.list`; sandbox refs mean nothing in live. |
 | `422 validation_failed` | Fix the fields listed under `details`; nothing was changed. |
 | `429 rate_limited` | Wait `retry_after_seconds`. The limit is per key (1,000 an hour by default). Use filters and `per_page` up to 100. Token calls are limited to 10 a minute. |

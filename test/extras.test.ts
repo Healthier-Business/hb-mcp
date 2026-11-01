@@ -19,7 +19,7 @@ describe('resources', () => {
     const { resources } = await h.client.listResources();
     const uris = resources.map((r) => r.uri);
     expect(uris).toEqual(expect.arrayContaining(['hb://guides/authentication', 'hb://guides/going-live', 'hb://portals/occupational-health', 'hb://portals/hub', 'hb://spec/overview']));
-    expect(uris.filter((u) => u.startsWith('hb://guides/'))).toHaveLength(36);
+    expect(uris.filter((u) => u.startsWith('hb://guides/'))).toHaveLength(37);
     const auth = await h.client.readResource({ uri: 'hb://guides/authentication' });
     expect((auth.contents[0] as any).text).toContain('refresh token');
     const portal = await h.client.readResource({ uri: 'hb://portals/occupational-health' });

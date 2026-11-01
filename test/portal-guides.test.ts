@@ -18,13 +18,13 @@ afterEach(async () => {
 });
 
 describe('developer portal guides', () => {
-  it('lists all 21 portal guides after the 15 API guides, each with a description, and reads them', async () => {
+  it('lists all 21 portal guides after the 16 API guides, each with a description, and reads them', async () => {
     h = await startHarness();
     const { resources } = await h.client.listResources();
     const guides = resources.filter((r) => r.uri.startsWith('hb://guides/'));
-    expect(guides).toHaveLength(36);
-    expect(guides.slice(15).map((r) => r.uri)).toEqual(PORTAL_SLUGS.map((s) => `hb://guides/${s}`));
-    for (const g of guides.slice(15)) {
+    expect(guides).toHaveLength(37);
+    expect(guides.slice(16).map((r) => r.uri)).toEqual(PORTAL_SLUGS.map((s) => `hb://guides/${s}`));
+    for (const g of guides.slice(16)) {
       expect(g.description?.length ?? 0).toBeGreaterThan(30);
       const read = await h.client.readResource({ uri: g.uri });
       const text = (read.contents[0] as { text: string }).text;
