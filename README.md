@@ -1,6 +1,6 @@
 # Hub MCP server
 
-`@healthier-business/hub-mcp` is a [Model Context Protocol](https://modelcontextprotocol.io) server for the **Healthier Business Hub API v2**. It lets an AI assistant (Claude Code, Claude Desktop, Cursor, Codex, any MCP client) use every Hub endpoint: 200 operations across the Hub core and ten portals, plus the 66 webhook events as knowledge.
+`@healthier-business/hub-mcp` is a [Model Context Protocol](https://modelcontextprotocol.io) server for the **Healthier Business Hub API v2**. It lets an AI assistant (Claude Code, Claude Desktop, Cursor, Codex, any MCP client) use every Hub endpoint: 213 operations across the Hub core and ten portals, plus the 73 webhook events as knowledge.
 
 It is built to be safe by default:
 
@@ -112,7 +112,7 @@ When it works in the sandbox, follow the `go-live-checklist` prompt (or `hb://gu
 
 ### Compact mode (default, `HB_TOOL_MODE=compact`): 8 tools plus the task tools
 
-MCP clients degrade or cap beyond about 40 tools, so the default is a handful of meta tools that reach all 200 operations, plus curated task tools for the common jobs (below): 22 tools read-only and 38 with writes enabled (`HB_TASK_TOOLS` changes that).
+MCP clients degrade or cap beyond about 40 tools, so the default is a handful of meta tools that reach all 213 operations, plus curated task tools for the common jobs (below): 22 tools read-only and 38 with writes enabled (`HB_TASK_TOOLS` changes that).
 
 | Tool | What it does |
 | --- | --- |
@@ -120,7 +120,7 @@ MCP clients degrade or cap beyond about 40 tools, so the default is a handful of
 | `hb_search_operations` | Search the operations by text, toolset (portal), method or scope. Says which are callable now and which the key's scopes allow. |
 | `hb_describe_operation` | Full detail: parameters, body schema with required fields and example, scope, credits, health data, errors, idempotency, a ready example call. |
 | `hb_call_operation` | Call any operation by id with `path_params`, `query`, `body`, `headers`. Validates against the spec first, adds `Idempotency-Key`, `all_pages` (capped), `fields` select, `confirm` for live writes. |
-| `hb_list_events` | The 66 webhook events (filter by portal or text). |
+| `hb_list_events` | The 73 webhook events (filter by portal or text). |
 | `hb_describe_event` | One event: payload schema, sample, delivery headers, verification rule. |
 | `hb_verify_webhook_signature` | Local, no network: verify or compute `sha256=` HMAC of `{timestamp}.{body}` with the 300 second window. |
 | `hb_search_guides` | Local, no network, no key needed: keyword search over the 36 bundled guides (15 API, 21 developer portal); returns the best matches with a snippet and the `hb://guides/<name>` to read. Useful for clients that do not browse resources. |
@@ -182,10 +182,10 @@ One tool per operation, generated from the bundled spec, named from the operatio
 | Toolset (`HB_TOOLSETS`) | Operations | Reads | Writes |
 | --- | --- | --- | --- |
 | `hub` | 4 | 2 | 2 |
-| `account` (webhooks) | 10 | 4 | 6 |
+| `account` (webhooks, API access) | 11 | 5 | 6 |
 | `authentication` | 4 (1 exposed) | 1 | 3 |
-| `online-training` | 14 | 12 | 2 |
-| `occupational-health` | 30 | 24 | 6 |
+| `online-training` | 24 | 16 | 8 |
+| `occupational-health` | 32 | 24 | 8 |
 | `references` | 11 | 5 | 6 |
 | `practical-training` | 20 | 14 | 6 |
 | `virtual-bls-training` | 14 | 9 | 5 |
@@ -194,9 +194,9 @@ One tool per operation, generated from the bundled spec, named from the operatio
 | `dbs-rtw` | 32 | 19 | 13 |
 | `clinical-appraisals` | 8 | 7 | 1 |
 | `training-verification` | 11 | 9 | 2 |
-| **Total** | **200** | **131** | **69** |
+| **Total** | **213** | **136** | **77** |
 
-Tool counts in full mode: all toolsets with writes on is 197 operation tools + 5 helpers + 30 task tools = 232; read-only (default) is 131 read tools + 5 + 14 task tools = 150 (`auth.me` is the only authentication tool). With `HB_TASK_TOOLS=core` that is 213 and 145 (writes on, read-only), with `none` 202 and 136. Use `HB_TOOLSETS` to stay under your client's limit, for example `HB_TOOLSETS=hub,occupational-health`.
+Tool counts in full mode: all toolsets with writes on is 210 operation tools + 5 helpers + 30 task tools = 245; read-only (default) is 136 read tools + 5 + 14 task tools = 155 (`auth.me` is the only authentication tool). With `HB_TASK_TOOLS=core` that is 226 and 150 (writes on, read-only), with `none` 215 and 141. Use `HB_TOOLSETS` to stay under your client's limit, for example `HB_TOOLSETS=hub,occupational-health`.
 
 The three credential operations (`auth.token.create`, `auth.refresh.create`, `auth.revoke.create`) are never exposed: the server exchanges the key and refreshes tokens itself, so a key or token never passes through a tool call.
 

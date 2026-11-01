@@ -25,11 +25,11 @@ describe('full mode', () => {
     }
   });
 
-  it('writes enabled in a sandbox: 197 operation tools, annotations from method and flags', async () => {
+  it('writes enabled in a sandbox: 210 operation tools, annotations from method and flags', async () => {
     h = await startHarness({ HB_TOOL_MODE: 'full', HB_READ_ONLY: 'false' });
     const { tools } = await h.client.listTools();
-    expect(tools.filter((t) => h!.ctx.catalogue.get(t.name))).toHaveLength(197);
-    expect(tools).toHaveLength(197 + 5 + 30);
+    expect(tools.filter((t) => h!.ctx.catalogue.get(t.name))).toHaveLength(210);
+    expect(tools).toHaveLength(210 + 5 + 30);
     const by = Object.fromEntries(tools.map((t) => [t.name, t]));
     expect(by.hub_candidates_create!.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false, idempotentHint: true });
     expect(by.webhooks_endpoints_delete!.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: true, idempotentHint: true });

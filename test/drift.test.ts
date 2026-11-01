@@ -25,9 +25,9 @@ describe('generated catalogue vs the bundled spec', () => {
     const cat = OperationCatalogue.load();
     const specOps = Object.values<any>(spec.paths).flatMap((i) => Object.values<any>(i).map((o) => o.operationId));
     expect(cat.operations.map((o) => o.id).sort()).toEqual([...specOps].sort());
-    expect(cat.operations).toHaveLength(200);
+    expect(cat.operations).toHaveLength(213);
     expect(cat.events).toHaveLength(Object.keys(spec.webhooks).length);
-    expect(cat.events).toHaveLength(66);
+    expect(cat.events).toHaveLength(73);
   });
 
   it('maps every tag to a toolset the config knows, and every toolset has operations', () => {
@@ -48,7 +48,7 @@ describe('generated catalogue vs the bundled spec', () => {
     const ctx = createContext(config);
     const tools = buildTools(ctx);
     const opTools = tools.filter((t) => ctx.catalogue.get(t.name));
-    expect(opTools).toHaveLength(200 - INTERNAL_OPERATIONS.size);
+    expect(opTools).toHaveLength(213 - INTERNAL_OPERATIONS.size);
     expect(tools.map((t) => t.name)).toEqual(expect.arrayContaining(['hb_status', 'hb_list_events', 'hb_describe_event', 'hb_verify_webhook_signature']));
     for (const op of ctx.catalogue.operations) {
       if (!op.internal) expect(() => buildInputSchema(op)).not.toThrow();
@@ -64,7 +64,7 @@ describe('generated catalogue vs the bundled spec', () => {
       expect(c.healthData).toBe(o['x-health-data'] === true);
       expect(c.credits !== null).toBe(o['x-credits'] !== undefined);
     }
-    expect(cat.operations.filter((o) => o.credits)).toHaveLength(11);
+    expect(cat.operations.filter((o) => o.credits)).toHaveLength(12);
     expect(cat.operations.filter((o) => o.healthData)).toHaveLength(9);
   });
 });

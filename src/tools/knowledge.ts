@@ -141,7 +141,7 @@ export function searchGuidesTool(): ToolDefinition {
 export function listEventsTool(ctx: AppContext): ToolDefinition {
   return {
     name: 'hb_list_events',
-    description: 'List the 66 webhook events Hub can send (type and one-line summary). Optionally filter by portal prefix (e.g. "occupational-health") or text. Knowledge only: sends nothing.',
+    description: 'List the 73 webhook events Hub can send (type and one-line summary). Optionally filter by portal prefix (e.g. "occupational-health") or text. Knowledge only: sends nothing.',
     inputSchema: {
       type: 'object',
       properties: {

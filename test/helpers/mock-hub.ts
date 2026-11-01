@@ -444,7 +444,8 @@ export class MockHub {
       if (missing.length) return err(422, 'validation_failed', 'The given data was invalid.', Object.fromEntries(missing.map((m: string) => [m, [`The ${m} field is required.`]])), rl);
     }
 
-    const successKey = Object.keys(route.op.responses).find((k) => k.startsWith('2')) ?? '200';
+    const successKeys = Object.keys(route.op.responses).filter((k) => k.startsWith('2'));
+    const successKey = successKeys.find((k) => k === '201') ?? successKeys[0] ?? '200';
     const content = deref(route.op.responses[successKey])?.content ?? {};
     const ctype = Object.keys(content)[0];
     let status = Number(successKey);

@@ -1,6 +1,6 @@
 # Hub MCP server: design
 
-Package `@healthier-business/hub-mcp`, binary `hb-hub-mcp`. A Model Context Protocol server that lets an AI assistant use the Healthier Business Hub API v2 (200 operations, 66 webhook events) safely. The contract is `spec/hub-v2.json`, a bundled copy of the Hub OpenAPI document.
+Package `@healthier-business/hub-mcp`, binary `hb-hub-mcp`. A Model Context Protocol server that lets an AI assistant use the Healthier Business Hub API v2 (213 operations, 73 webhook events) safely. The contract is `spec/hub-v2.json`, a bundled copy of the Hub OpenAPI document.
 
 ## Principles
 

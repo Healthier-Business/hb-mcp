@@ -67,7 +67,7 @@ describe('task tool surface', () => {
     h = await startHarness({ ...WRITE_ENV, HB_TOOL_MODE: 'full' });
     const full = (await h.client.listTools()).tools;
     expect(full.filter((t) => (TASK_TOOL_NAMES as readonly string[]).includes(t.name))).toHaveLength(30);
-    expect(full).toHaveLength(197 + 5 + 30);
+    expect(full).toHaveLength(210 + 5 + 30);
   });
 
   it('HB_TASK_TOOLS=core offers the first seven plus credits, bookings, webhook health and verification status; none offers no task tool', async () => {

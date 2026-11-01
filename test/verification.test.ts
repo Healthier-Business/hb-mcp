@@ -73,12 +73,12 @@ describe('tool counts', () => {
   });
   it('full: all, core and none, read-only and with writes', async () => {
     const full = { HB_TOOL_MODE: 'full' };
-    expect(await count(full)).toBe(131 + 5 + 14);
-    expect(await count({ ...full, ...WRITE_ENV })).toBe(197 + 5 + 30);
-    expect(await count({ ...full, HB_TASK_TOOLS: 'core' })).toBe(131 + 5 + 9);
-    expect(await count({ ...full, ...WRITE_ENV, HB_TASK_TOOLS: 'core' })).toBe(197 + 5 + 11);
-    expect(await count({ ...full, HB_TASK_TOOLS: 'none' })).toBe(131 + 5);
-    expect(await count({ ...full, ...WRITE_ENV, HB_TASK_TOOLS: 'none' })).toBe(197 + 5);
+    expect(await count(full)).toBe(136 + 5 + 14);
+    expect(await count({ ...full, ...WRITE_ENV })).toBe(210 + 5 + 30);
+    expect(await count({ ...full, HB_TASK_TOOLS: 'core' })).toBe(136 + 5 + 9);
+    expect(await count({ ...full, ...WRITE_ENV, HB_TASK_TOOLS: 'core' })).toBe(210 + 5 + 11);
+    expect(await count({ ...full, HB_TASK_TOOLS: 'none' })).toBe(136 + 5);
+    expect(await count({ ...full, ...WRITE_ENV, HB_TASK_TOOLS: 'none' })).toBe(210 + 5);
   });
   it('hb_verification_status is in core; hb_verify_certificate is not', async () => {
     h = await startHarness({ ...WRITE_ENV, HB_TASK_TOOLS: 'core' });

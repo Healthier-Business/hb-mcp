@@ -186,7 +186,9 @@ function buildOperation(spec: Spec, path: string, method: (typeof METHODS)[numbe
   }
 
   const responses = op.responses as Record<string, JsonObject>;
-  const successKey = Object.keys(responses).find((k) => k.startsWith('2')) ?? '200';
+  // When an operation answers both 200 (already exists) and 201 (created), describe the creating answer.
+  const successKeys = Object.keys(responses).filter((k) => k.startsWith('2'));
+  const successKey = successKeys.find((k) => k === '201') ?? successKeys[0] ?? '200';
   const successResponse = responses[successKey] ?? {};
   const success = {
     status: Number(successKey),
