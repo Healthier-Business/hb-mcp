@@ -1,7 +1,7 @@
 {
   "name": "hb-hub",
   "displayName": "Healthier Business Hub",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Use the Healthier Business Hub API v2 from Claude Code: read-only by default, sandbox first, live writes need a plan and an explicit yes.",
   "author": { "name": "Healthier Business" },
   "homepage": "https://github.com/Healthier-Business/hb-mcp#readme",
