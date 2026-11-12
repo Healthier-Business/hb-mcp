@@ -30,7 +30,7 @@ export const saveCandidateTool = writeTask({
   name: 'hb_save_candidate',
   title: 'Create or update a candidate',
   description:
-    'Create a new candidate, or update an existing one (pass candidate_ref), in two calls. Creating first searches for an existing candidate with the same email or name and REFUSES to create a duplicate unless allow_duplicate=true. Updating shows a field-by-field before and after in the plan. CALL 1 sends nothing; CALL 2 needs confirm=true. Creating emails the candidate an activation link unless is_active is false (a real person on live). Uses hub.candidates.list, .show, .create and .update (create takes an idempotency key).',
+    'Create a new candidate, or update an existing one (pass candidate_ref), in two calls. Creating first searches for an existing candidate with the same email or name and REFUSES to create a duplicate unless allow_duplicate=true. Updating shows a field-by-field before and after in the plan. CALL 1 sends nothing; CALL 2 needs the confirmation_token from call 1 (in a sandbox confirm=true also works). Creating emails the candidate an activation link unless is_active is false (a real person on live). Uses hub.candidates.list, .show, .create and .update (create takes an idempotency key).',
   properties: {
     candidate_ref: { type: 'string', description: 'Update this candidate. Omit to create.' },
     first_name: { type: 'string' },
@@ -123,7 +123,7 @@ export const assignTrainingTool = writeTask({
   name: 'hb_assign_training',
   title: 'Assign online courses',
   description:
-    'Assign online training courses to a candidate, in two calls. The Hub sets the EXACT course list, so this tool reads the courses the candidate already has and sends existing + course_ids - remove_course_ids: nothing is removed unless you name it. CALL 1 shows which courses are added, kept and removed (names resolved from the catalogue), the credits balance, and who will be emailed; it sends nothing. CALL 2 with confirm=true assigns (credits may be used when the account pays), then optionally sends a reminder email (send_email). On live the candidate is emailed about the added courses: a real person. Uses online-training.candidates.results, .courses.list, .credits.show, .candidates.courses and .candidates.emails.',
+    'Assign online training courses to a candidate, in two calls. The Hub sets the EXACT course list, so this tool reads the courses the candidate already has and sends existing + course_ids - remove_course_ids: nothing is removed unless you name it. CALL 1 shows which courses are added, kept and removed (names resolved from the catalogue), the credits balance, and who will be emailed; it sends nothing. CALL 2 with the confirmation_token from call 1 (in a sandbox confirm=true also works) assigns (credits may be used when the account pays), then optionally sends a reminder email (send_email). On live the candidate is emailed about the added courses: a real person. Uses online-training.candidates.results, .courses.list, .credits.show, .candidates.courses and .candidates.emails.',
   properties: {
     candidate_ref: { type: 'string' },
     course_ids: { type: 'array', items: { type: 'integer' }, description: 'Course ids to add (online-training.courses.list; hb_training_progress with available_courses lists them).' },
@@ -219,7 +219,7 @@ export const requestReferencesTool = writeTask({
   name: 'hb_request_references',
   title: 'Request references',
   description:
-    'Ask for references for a candidate, in two calls. Create a request with collection_mode client_adds (you give the referees; each is emailed their private link at once) or candidate_provides (the candidate is emailed a page to enter referees), or add one referee to an existing request (request_uuid). CALL 1 lists the templates, shows any existing requests for the candidate and exactly who will be emailed (names and addresses); it sends nothing. CALL 2 with confirm=true sends. The emails go to real people on live. A duplicate request is not refused by the Hub, so the plan warns. Uses references.templates.list, .requests.list/.show/.create and .requests.referees.create.',
+    'Ask for references for a candidate, in two calls. Create a request with collection_mode client_adds (you give the referees; each is emailed their private link at once) or candidate_provides (the candidate is emailed a page to enter referees), or add one referee to an existing request (request_uuid). CALL 1 lists the templates, shows any existing requests for the candidate and exactly who will be emailed (names and addresses); it sends nothing. CALL 2 with the confirmation_token from call 1 (in a sandbox confirm=true also works) sends. The emails go to real people on live. A duplicate request is not refused by the Hub, so the plan warns. Uses references.templates.list, .requests.list/.show/.create and .requests.referees.create.',
   properties: {
     candidate_ref: { type: 'string', description: 'Create: the candidate.' },
     request_uuid: { type: 'string', description: 'Add a referee to this existing request instead of creating one.' },
@@ -309,7 +309,7 @@ export const requestOccupationalHealthTool = writeTask({
   name: 'hb_request_occupational_health',
   title: 'Request occupational health clearance',
   description:
-    'Create an occupational health request for a candidate, in two calls. CALL 1 reads the request options and clearance types (and the credits), validates your choices against them and returns the plan; nothing is sent. CALL 2 with confirm=true creates the request (uses credits; idempotency key). No health answers are handled: with the online questionnaire the candidate completes it themselves and is emailed (a real person on live; notify_candidate=false skips that email). Paper questionnaires and file uploads are not supported by this tool. Uses occupational-health.request-options.show, .clearance-types.list, .credits.show, .requests.create and hub.candidates.show.',
+    'Create an occupational health request for a candidate, in two calls. CALL 1 reads the request options and clearance types (and the credits), validates your choices against them and returns the plan; nothing is sent. CALL 2 with the confirmation_token from call 1 (in a sandbox confirm=true also works) creates the request (uses credits; idempotency key). No health answers are handled: with the online questionnaire the candidate completes it themselves and is emailed (a real person on live; notify_candidate=false skips that email). Paper questionnaires and file uploads are not supported by this tool. Uses occupational-health.request-options.show, .clearance-types.list, .credits.show, .requests.create and hub.candidates.show.',
   properties: {
     candidate_ref: { type: 'string' },
     request_type: { type: 'string', enum: ['new_starter', 'renewal'] },
@@ -388,7 +388,7 @@ export const chaseOutstandingTool = writeTask({
   name: 'hb_chase_outstanding',
   title: 'Chase outstanding items',
   description:
-    'Send reminders for outstanding items, in two calls. `kind`: references_reminders (remind every referee of a request who is due), references_referee_reminder (one referee), references_extend (give a request more days), references_cancel (cancel a request: final), occupational_health_reminder (remind a candidate to complete the health questionnaire), training_email (remind a candidate about online training). CALL 1 lists exactly who will be contacted (names and addresses) and sends nothing; CALL 2 with confirm=true sends. Reminders are real emails to real people on live; repeat calls send repeat emails, so do not loop. Uses references.requests.show/.reminders/.extend/.cancel, references.referees.reminder, occupational-health.candidates.show/.reminder and online-training.candidates.show/.emails.',
+    'Send reminders for outstanding items, in two calls. `kind`: references_reminders (remind every referee of a request who is due), references_referee_reminder (one referee), references_extend (give a request more days), references_cancel (cancel a request: final), occupational_health_reminder (remind a candidate to complete the health questionnaire), training_email (remind a candidate about online training). CALL 1 lists exactly who will be contacted (names and addresses) and sends nothing; CALL 2 with the confirmation_token from call 1 (in a sandbox confirm=true also works) sends. Reminders are real emails to real people on live; repeat calls send repeat emails, so do not loop. Uses references.requests.show/.reminders/.extend/.cancel, references.referees.reminder, occupational-health.candidates.show/.reminder and online-training.candidates.show/.emails.',
   properties: {
     kind: { type: 'string', enum: [...KINDS] },
     request_uuid: { type: 'string', description: 'References kinds: the request.' },

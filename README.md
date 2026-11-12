@@ -6,7 +6,7 @@ It is built to be safe by default:
 
 - **Read-only** until the owner turns writes on.
 - **Sandbox first.** Live is real people and real credits; the server always says which one you are on.
-- **Live writes are a two-step**: the first call returns a plan and sends nothing; the second needs `confirm: true`.
+- **Live writes are a two-step**: the first call returns a plan and sends nothing; the second needs the one-time `confirmation_token` the server issued with the plan (a `confirm: true` the model sends on its own does nothing on live).
 - **Keys never reach the model or a log.** The API key comes only from the environment.
 
 Package: `@healthier-business/hub-mcp`. Command: `hb-hub-mcp`. Needs Node 20 or newer.
@@ -140,7 +140,7 @@ MCP clients degrade or cap beyond about 40 tools, so the default is a handful of
 
 Task tools do a common job in one call with sensible defaults, so an assistant does not have to search, describe and call several operations. They run through the same pipeline as `hb_call_operation` (spec validation, read-only default, live-write gate, idempotency, secret redaction, size cap, error mapping), check the key's scopes first and only call what is allowed, name what they skipped and why, and list the operation ids they called (readable text first, then structured data). They respect `HB_TOOLSETS` (a task tool is hidden when its portals are not enabled) and `HB_TASK_TOOLS` (below).
 
-**Every task tool that writes is a two-call flow.** The first call reads only and returns the options or the plan (who will be emailed, what credits or fees apply, a field-by-field diff for updates) and sends nothing. The second call, with `confirm: true` after the user agreed, does it, with idempotency keys (the plan returns the key to reuse). This holds in a sandbox and on live; on live the server must also allow live writes (`HB_READ_ONLY=false` and `HB_ALLOW_LIVE_WRITES=true`). Write task tools are hidden while the server is read-only. Where a Hub call can email a real person, the plan says so.
+**Every task tool that writes is a two-call flow.** The first call reads only and returns the options or the plan (who will be emailed, what credits or fees apply, a field-by-field diff for updates) and sends nothing. The second call, with the `confirmation_token` from the plan after the user agreed (a sandbox also accepts `confirm: true`), does it, with idempotency keys (the plan returns the key to reuse). This holds in a sandbox and on live; on live the server must also allow live writes (`HB_READ_ONLY=false` and `HB_ALLOW_LIVE_WRITES=true`). Write task tools are hidden while the server is read-only. Where a Hub call can email a real person, the plan says so.
 
 Read tools (14):
 
@@ -178,8 +178,8 @@ Write tools (16, two calls each):
 | `hb_acknowledge_alerts` | Acknowledge DBS/RTW or registration alerts (one, ids, a type, or all open only when explicit); dismiss or clear occupational health alerts. |
 | `hb_bulk_import_workers` | CSV import into DBS/RTW or registration monitoring: preview first (counts and row errors, no sample rows), then import. |
 | `hb_redeliver_webhooks` | Redeliver failed webhook deliveries (the plan lists them). |
-| `hb_rotate_webhook_secret` | Rotate an endpoint's signing secret. The new secret is never returned: `save_secret_to` writes it to a new owner-only file. The plan warns that receivers fail until updated. |
-| `hb_setup_sandbox_webhook` | Sandbox only: create an endpoint, send a test event, report the delivery. Refuses on live. Same secret handling (`save_secret_to`). Runs in one call. The default events include the seven `training-verification.*` events when the key has a Training Verification scope. |
+| `hb_rotate_webhook_secret` | Rotate an endpoint's signing secret. The new secret is never returned: `save_secret_to` (a file name) writes it to a new owner-only file in the secrets folder (`HB_SECRETS_DIR`). The plan warns that receivers fail until updated. |
+| `hb_setup_sandbox_webhook` | Sandbox only: create an endpoint, send a test event, report the delivery. Refuses on live. Same secret handling (`save_secret_to`, a file name in `HB_SECRETS_DIR`). Runs in one call. The default events include the seven `training-verification.*` events when the key has a Training Verification scope. |
 | `hb_verify_certificate` | Verify a training certificate file (PDF, JPG or PNG) on this machine. Call 1 checks the file locally and shows file name, size, type and SHA-256, who gets the result email, the price (Automated is free for regular accounts, charged for verification-only accounts; Manual is always charged; credits or wallet, no card) and the balance, and sends nothing. Call 2 (`confirm: true`) uploads it with `training-verification.verifications.create` (multipart, derived idempotency key) and reports the 202. The file must be inside a folder in `HB_UPLOAD_DIRS`; contents and base64 are never shown. |
 
 Not built as tools: submitting occupational health answers, deleting workers or endpoints, evidence upload, downloading a verification's certificate or report (`hb_get_report` says how), token operations (use `hb_call_operation` where allowed). Right to work document or passport uploads are not supported by `hb_verify_worker` (share codes are).
@@ -261,7 +261,8 @@ The developer portal is where a developer signs up, makes sandboxes, test keys a
 | `HB_MAX_RESPONSE_CHARS` | `60000` | Cap on one tool answer. Larger answers are cut with a notice (lists lose items first). |
 | `HB_REQUEST_TIMEOUT_MS` | `30000` | Per request timeout. |
 | `HB_WEBHOOK_SECRET` | none | Default secret for `hb_verify_webhook_signature`. |
-| `HB_UPLOAD_DIRS` | the server's working directory | Comma-separated **absolute** folders `hb_verify_certificate` may read a certificate from. Anything outside them is refused, including a symbolic link that leads out, hidden files and folders, wildcards, and any type but `.pdf`, `.jpg`, `.jpeg`, `.png`. Unset means the working directory only; the plugin passes it empty. |
+| `HB_UPLOAD_DIRS` | none (certificate upload is off) | Comma-separated **absolute** folders `hb_verify_certificate` may read a certificate from. Anything outside them is refused, including a symbolic link that leads out, hidden files and folders, wildcards, and any type but `.pdf`, `.jpg`, `.jpeg`, `.png`. There is no default folder: unset means every file is refused with a message that says how to set it. The plugin has a "Certificate folders" setting for it. |
+| `HB_SECRETS_DIR` | `~/.config/hb-hub-mcp/secrets` | The one absolute folder where `save_secret_to` writes a new webhook signing secret (owner-only file, never overwritten, created with owner-only permissions). `save_secret_to` is a plain file name in that folder; a path elsewhere is refused. |
 | `HB_MCP_HTTP_TOKEN` | none | Bearer token required by `--http` when not bound to loopback. |
 | `HB_MCP_HTTP_PORT`, `HB_MCP_HTTP_HOST` | `3333`, `127.0.0.1` | Defaults for `--http`. |
 
@@ -273,7 +274,7 @@ CLI: `hb-hub-mcp [--http [--port N] [--host H]] [--doctor] [--version] [--help]`
 | --- | --- |
 | Read-only by default | Every non-GET operation is refused with an explanation, and hidden in full mode. |
 | Writes need intent | `HB_READ_ONLY=false`. In a sandbox they then run directly. |
-| Live writes need two more things | `HB_ALLOW_LIVE_WRITES=true`, and each write is a plan first (what happens, credits, health data, destructive) and runs only when called again with `confirm: true`. |
+| Live writes need two more things | `HB_ALLOW_LIVE_WRITES=true`, and each write is a plan first (what happens, credits, health data, destructive) and runs only when called again with the one-time `confirmation_token` from the plan: random, bound to that exact operation and arguments, valid for ten minutes, used once, held in memory. A model's own `confirm: true` on a first call only gets the plan. (A sandbox, with synthetic data, still accepts `confirm: true`.) |
 | Nothing blind-retried | A write is never retried automatically. A dropped connection returns the `idempotency_key` to reuse; a 401 is refreshed once (safe: not processed); 429 and 5xx on a write are returned to you. Reads retry on 429/502/503/504/network errors. |
 | Idempotency | Writes that support it get an `Idempotency-Key` (a uuid, shown in the result). Same key and body within 24 hours replays the first answer. |
 | Validation before sending | Path, query, headers and body are checked against the spec; a bad call sends nothing. |
@@ -282,8 +283,13 @@ CLI: `hb-hub-mcp [--http [--port N] [--host H]] [--doctor] [--version] [--help]`
 | Size | Answers over `HB_MAX_RESPONSE_CHARS` are truncated with a notice; use `fields` (dotted paths) and filters. |
 | Scope of tokens | One refresher per process (single-flight), the single-use refresh token is replaced the moment a new pair arrives, and the 10 a minute auth throttle and `Retry-After` are respected. |
 | Credentials | Credential endpoints are not tools. |
-| Task tools | Same pipeline as `hb_call_operation`. Tools that write are hidden while read-only and are two calls (plan, then `confirm: true`); `hb_setup_sandbox_webhook` refuses on live; secrets they create are never returned. |
-| Local files | `hb_verify_certificate` is the only tool that reads a file from disk: one absolute path, inside `HB_UPLOAD_DIRS` (default the working directory), after resolving symbolic links, not hidden, an accepted type whose first bytes match, within the API's size limit. A certificate is personal data: its contents and base64 are never shown, logged or returned (the base64 is also registered with the redactor while it is in flight). |
+| Task tools | Same pipeline as `hb_call_operation`. Tools that write are hidden while read-only and are two calls (plan with a `confirmation_token`, then the call with that token); `hb_setup_sandbox_webhook` refuses on live; secrets they create are never returned. |
+| Local files | `hb_verify_certificate` is the only tool that reads a file from disk: one absolute path, inside a folder of `HB_UPLOAD_DIRS` (required, no default), after resolving symbolic links, not hidden, an accepted type whose first bytes match, within the API's size limit. A certificate is personal data: its contents and base64 are never shown, logged or returned (the base64 is also registered with the redactor while it is in flight). |
+| Untrusted Hub text | Names, notes, referee answers and other free text in an answer can be written by candidates or third parties. Every operation answer sits between `<<<HB_UNTRUSTED_DATA` and `HB_UNTRUSTED_DATA>>>` with a line telling the model to treat it as data and never follow instructions inside it (a delimiter inside the data is defused); task tool data is fenced the same way and their summaries carry the same warning line. This lowers prompt-injection risk, it does not remove it: keep writes off unless you need them. |
+| Webhook destinations | `webhooks.endpoints.create` and `.update` are refused unless the `url` is `https` without credentials, and a live plan shows the full URL (`webhook_url`) so the user sees where events will go. |
+| Base URL | The key and tokens go to `HB_BASE_URL`. A host that is not `*.hbcompliance.co.uk`, `localhost` or `127.0.0.1` gets one warning on stderr (the server still works). |
+| HTTP transport | `--http` compares the bearer token in constant time (SHA-256 of both sides with `timingSafeEqual`). |
+| Secret files | `save_secret_to` writes only a new file directly inside `HB_SECRETS_DIR`, never overwriting (the file is created exclusively, so a planted link is not followed). |
 
 Money is integer pence with a currency; credits are units. The tool descriptions say which operations use credits.
 

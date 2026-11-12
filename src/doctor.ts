@@ -1,4 +1,4 @@
-import { TOOLSETS, writesEnabled, type Config } from './config.js';
+import { baseUrlHostWarning, TOOLSETS, writesEnabled, type Config } from './config.js';
 import { SERVER_VERSION } from './context.js';
 import { describeError, HubApiError } from './errors.js';
 import { TokenManager } from './tokens.js';
@@ -22,6 +22,11 @@ export async function runDoctor(config: Config, fetchImpl: typeof fetch = fetch)
   if (config.mode === 'live') add('warn', 'This is the LIVE Hub. Use a sandbox while building.');
   add('info', `Tool mode: ${config.toolMode}; toolsets: ${config.toolsets.length === TOOLSETS.length ? 'all' : config.toolsets.join(', ')}`);
   add(config.readOnly ? 'ok' : 'warn', config.readOnly ? 'Read-only (HB_READ_ONLY=true): writes are refused.' : `Writes enabled: ${writesEnabled(config) ? 'yes' : 'no (live writes need HB_ALLOW_LIVE_WRITES=true)'}`);
+
+  add('info', config.uploadDirs.length ? `Certificate folders (HB_UPLOAD_DIRS): ${config.uploadDirs.join(', ')}` : 'Certificate upload is off: HB_UPLOAD_DIRS is not set (there is no default folder).');
+  add('info', `Webhook secret folder (HB_SECRETS_DIR): ${config.secretsDir}`);
+  const hostWarning = baseUrlHostWarning(config.baseUrl);
+  if (hostWarning) add('warn', hostWarning);
 
   if (!config.apiKey) {
     add('fail', 'HB_API_KEY is not set.');

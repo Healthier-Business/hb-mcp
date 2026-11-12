@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { createServer, type IncomingMessage, type Server as HttpServer, type ServerResponse } from 'node:http';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { AppContext } from './context.js';
@@ -13,6 +13,13 @@ export interface HttpOptions {
 }
 
 const LOOPBACK = new Set(['127.0.0.1', 'localhost', '::1']);
+
+/** Constant-time comparison of the Authorization header with `Bearer <token>`: both sides are hashed first so lengths never leak. */
+export function bearerMatches(header: string | string[] | undefined, token: string): boolean {
+  const given = createHash('sha256').update(typeof header === 'string' ? header : '').digest();
+  const expected = createHash('sha256').update(`Bearer ${token}`).digest();
+  return timingSafeEqual(given, expected) && typeof header === 'string';
+}
 
 async function readJson(req: IncomingMessage, limit = 4 * 1024 * 1024): Promise<unknown> {
   const chunks: Buffer[] = [];
@@ -47,7 +54,7 @@ export async function startHttpServer(ctx: AppContext, opts: HttpOptions): Promi
       if (url.pathname !== '/mcp') {
         return send(404, { error: 'not_found', message: 'The MCP endpoint is /mcp' });
       }
-      if (opts.authToken && req.headers.authorization !== `Bearer ${opts.authToken}`) {
+      if (opts.authToken && !bearerMatches(req.headers.authorization, opts.authToken)) {
         return send(401, { error: 'unauthorized', message: 'Missing or wrong bearer token for this MCP server.' });
       }
       const sessionId = req.headers['mcp-session-id'];

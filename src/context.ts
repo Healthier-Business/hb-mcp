@@ -1,11 +1,12 @@
 import type { OperationCatalogue } from './catalogue.js';
 import type { Config } from './config.js';
+import type { ConfirmationStore } from './confirmation.js';
 import type { Executor } from './execute.js';
 import type { HubClient } from './http.js';
 import type { TokenManager } from './tokens.js';
 
 export const SERVER_NAME = 'hb-hub-mcp';
-export const SERVER_VERSION = '0.4.0';
+export const SERVER_VERSION = '0.4.1';
 
 /** Everything a tool needs. One per process; shared by every MCP session. */
 export interface AppContext {
@@ -14,6 +15,8 @@ export interface AppContext {
   tokens: TokenManager;
   client: HubClient;
   executor: Executor;
+  /** One-time confirmation tokens for live writes (in memory, shared by every MCP session of this process). */
+  confirmations: ConfirmationStore;
   /** Scopes of the key, learnt from /auth/me (hb_status). Undefined until known. */
   keyScopes?: string[];
   /** Pause between polls (task tools); replaced in tests. */

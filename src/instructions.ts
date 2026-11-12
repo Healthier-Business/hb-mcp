@@ -39,7 +39,7 @@ export function buildInstructions(config: Config, opCount: number, eventCount: n
   const env = config.mode === 'live' ? 'LIVE (real people, real data, real credits)' : 'SANDBOX (synthetic data; nothing real is touched)';
   const writes = writesEnabled(config)
     ? config.mode === 'live'
-      ? 'Writes are enabled on the LIVE Hub. Every write first returns a plan and sends nothing; show it to the user and repeat with confirm=true only after they say yes.'
+      ? 'Writes are enabled on the LIVE Hub. Every write first returns a plan and sends nothing; show it to the user and repeat the same call with its one-time confirmation_token only after they say yes (confirm=true does nothing on the LIVE Hub). Never send a confirmation_token the user has not approved.'
       : 'Writes are enabled in this sandbox.'
     : 'The server is read-only: only GET operations run. Writes are refused until the owner sets HB_READ_ONLY=false (and, for live, HB_ALLOW_LIVE_WRITES=true).';
   const how =
@@ -49,10 +49,10 @@ export function buildInstructions(config: Config, opCount: number, eventCount: n
   const offered = new Set(taskToolNames);
   const jobs = TASK_JOBS.filter(([name]) => offered.has(name)).map(([name, job]) => `${name} (${job})`);
   const tasks = jobs.length
-    ? `Task tools do the common jobs in one call with sensible defaults, through the same safety pipeline as hb_call_operation (read-only default, plan-then-confirm, idempotency, secret redaction); prefer them when they match, and each result lists the operation ids it called. Every task tool that writes is two calls: the first returns the options or plan and sends nothing, the second needs confirm=true after the user agrees; they are hidden while the server is read-only. Which tool for which job: ${jobs.join('; ')}. Use the generic tools for everything else. HB_TASK_TOOLS (all, core or none) chooses which task tools are offered.`
+    ? `Task tools do the common jobs in one call with sensible defaults, through the same safety pipeline as hb_call_operation (read-only default, plan-then-confirm, idempotency, secret redaction); prefer them when they match, and each result lists the operation ids it called. Every task tool that writes is two calls: the first returns the options or plan and sends nothing, the second needs the confirmation_token from the first call (in a sandbox confirm=true also works) after the user agrees; they are hidden while the server is read-only. Which tool for which job: ${jobs.join('; ')}. Use the generic tools for everything else. HB_TASK_TOOLS (all, core or none) chooses which task tools are offered.`
     : 'No task tools are offered (HB_TASK_TOOLS=none): use the generic tools.';
   const uploads = offered.has('hb_verify_certificate')
-    ? `hb_verify_certificate reads one local certificate file (.pdf, .jpg, .jpeg or .png) by absolute path, only inside the folders listed in HB_UPLOAD_DIRS (default: the server's working directory only; ${config.uploadDirs.join(', ')} now). Hidden files, links that leave those folders, wildcards and other file types are refused. A certificate is personal data: never print, paste or summarise its contents or base64; show only its name, size and SHA-256. If the file is refused, tell the user to move it into an allowed folder or ask the owner to add one; never try another path to get around it.`
+    ? `hb_verify_certificate reads one local certificate file (.pdf, .jpg, .jpeg or .png) by absolute path, only inside the folders listed in HB_UPLOAD_DIRS (${config.uploadDirs.length ? `now: ${config.uploadDirs.join(', ')}` : 'NOT SET: there is no default folder, so the tool refuses every file until the owner sets HB_UPLOAD_DIRS and restarts'}). Hidden files, links that leave those folders, wildcards and other file types are refused. A certificate is personal data: never print, paste or summarise its contents or base64; show only its name, size and SHA-256. If the file is refused, tell the user to move it into an allowed folder or ask the owner to add one; never try another path to get around it.`
     : undefined;
   const noBaseUrl =
     !config.apiKey && config.modeSource === 'default'

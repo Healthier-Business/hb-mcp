@@ -12,6 +12,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { OperationCatalogue } from './catalogue.js';
 import type { Config } from './config.js';
+import { ConfirmationStore } from './confirmation.js';
 import { SERVER_NAME, SERVER_VERSION, type AppContext } from './context.js';
 import { describeError } from './errors.js';
 import { Executor } from './execute.js';
@@ -39,8 +40,9 @@ export function createContext(config: Config, overrides: ContextOverrides = {}):
   redactor.add(config.webhookSecret);
   const tokens = new TokenManager({ apiKey: config.apiKey, baseUrl: config.baseUrl, timeoutMs: config.requestTimeoutMs, fetchImpl: overrides.fetchImpl });
   const client = new HubClient({ baseUrl: config.baseUrl, timeoutMs: config.requestTimeoutMs, tokens, fetchImpl: overrides.fetchImpl, sleep: overrides.sleep });
-  const executor = new Executor(config, catalogue, client);
-  return { config, catalogue, tokens, client, executor, sleep: overrides.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms))) };
+  const confirmations = new ConfirmationStore();
+  const executor = new Executor(config, catalogue, client, confirmations);
+  return { config, catalogue, tokens, client, executor, confirmations, sleep: overrides.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms))) };
 }
 
 export function buildTools(ctx: AppContext): ToolDefinition[] {

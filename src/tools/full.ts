@@ -7,7 +7,7 @@ import { slimSchema } from '../schema.js';
 import { describeEventTool, listEventsTool, searchGuidesTool, statusTool, verifySignatureTool } from './knowledge.js';
 import type { ToolAnnotations, ToolDefinition } from './types.js';
 
-const RESERVED = new Set(['body', 'confirm', 'fields', 'all_pages', 'max_pages', 'idempotency_key']);
+const RESERVED = new Set(['body', 'confirm', 'confirmation_token', 'fields', 'all_pages', 'max_pages', 'idempotency_key']);
 
 export function annotationsFor(op: CatalogueOperation): ToolAnnotations {
   const read = op.method === 'GET';
@@ -53,7 +53,8 @@ export function buildInputSchema(op: CatalogueOperation): { schema: JsonObject; 
     properties.idempotency_key = { type: 'string', description: 'Reuse a key from a plan or an unknown-outcome call to repeat the write safely. Generated if omitted.' };
   }
   if (isWrite(op)) {
-    properties.confirm = { type: 'boolean', description: 'Live Hub only: true after the user approved the plan returned by the first call.' };
+    properties.confirm = { type: 'boolean', description: 'Sandbox only: true to confirm. On the LIVE Hub this does nothing: use confirmation_token.' };
+    properties.confirmation_token = { type: 'string', description: 'LIVE Hub: the one-time token from the plan returned by the first call; send it with the same arguments only after the user approved the plan.' };
   }
   if (op.paginated) {
     properties.all_pages = { type: 'boolean', description: 'Fetch following pages and merge them (capped).' };
@@ -103,6 +104,7 @@ export function buildFullTools(ctx: AppContext): ToolDefinition[] {
           query,
           body: args.body,
           confirm: args.confirm === true,
+          confirmation_token: typeof args.confirmation_token === 'string' ? args.confirmation_token : undefined,
           all_pages: args.all_pages === true,
           max_pages: typeof args.max_pages === 'number' ? args.max_pages : undefined,
           fields: Array.isArray(args.fields) ? (args.fields as string[]) : undefined,

@@ -71,6 +71,7 @@ Fields: `request_type` (`auto` or `manual`), `candidate_name`, `candidate_email`
 * `notify_email`: where the result email goes. It defaults to the account's first verification notification address (`default_notify_email`); with none, it is required. The result email still goes out, as for a Hub submission.
 * `candidate_ref`: links one of your Hub candidates. Validated; returned as `candidate_ref`.
 * `client_reference`: your own string, at most 100 characters, not required to be unique. Stored, returned on the verification, filterable (`client_reference=`) and included in every webhook.
+* `request_type` `auto`: at most 30 automatic submissions per key per hour; over that the call is `429 rate_limited` with `Retry-After`. The check uses the certificate's names only (see the result below).
 * The certificate is **either** a file or base64, with the same types (`pdf`, `jpg`, `jpeg`, `png`) and size limit as the Hub form (5120 kilobytes by default, `limits.max_certificate_kb`). The API never fetches a URL.
 
 Multipart upload:
@@ -145,9 +146,9 @@ Only while `pending`. The verification becomes `rejected` with the reason code `
 
 `verified`, `not_found`, `rejected` and `failed` are final unless staff re-run the verification, which sends its own new events.
 
-`result` is null until the status is final. Then: `matched` (true only for `verified`), `provider` (the agency whose training was found), `records` (on `GET /verifications/{verification}`: `title`, `completed_on`, `expires_on` UK dates, `type` `e-learning` or `practical`; the same facts as the result email, read when you ask), and `reason` for `not_found`, `rejected`, `failed`: a stable `code` and a fixed `message`.
+`result` is null until the status is final. Then: `matched` (true only for `verified`), `provider` (the agency named on the certificate whose training was found; only for a verified result), `records` (on `GET /verifications/{verification}`: only the courses the certificate names, and for an automatic request never the candidate's other courses; `title`, `completed_on`, `expires_on` UK dates, `type` `e-learning` or `practical`; the same facts as the result email, read when you ask), and `reason` for `not_found`, `rejected`, `failed`: a stable `code` and a fixed `message`.
 
-Reason codes: `file_unreadable`, `agency_not_found`, `candidate_not_found`, `ambiguous_candidate`, `ambiguous_agency`, `no_courses`, `tdta_not_found`, `tdta_not_passed`, `system_error`, `staff_rejected`, `cancelled_by_client`, `other`. Staff and engine comments are never returned.
+An automatic request is matched on the certificate names only. Every miss has the one reason code `other` with the message "The certificate could not be matched to a training record.": the more specific codes below (`agency_not_found`, `candidate_not_found`, `ambiguous_candidate`, `ambiguous_agency`, `no_courses`) are no longer given for an automatic request, so do not branch on them. Reason codes: `file_unreadable`, `agency_not_found`, `candidate_not_found`, `ambiguous_candidate`, `ambiguous_agency`, `no_courses`, `tdta_not_found`, `tdta_not_passed`, `system_error`, `staff_rejected`, `cancelled_by_client`, `other`. Staff and engine comments are never returned.
 
 `candidate_ref` on a verification is the one you sent; otherwise it is set only when a candidate of your own account was matched. A candidate of another account (the agency named on the certificate) is never exposed.
 
@@ -187,7 +188,7 @@ Top-ups and credit purchases are made in Hub. A retry with the same `Idempotency
 | 410 | `certificate_unavailable` | the certificate file is no longer held |
 | 413, 415 | `payload_too_large`, `unsupported_media_type` | the request body is too large for the server, or not JSON or multipart (a certificate over the Hub limit, or of the wrong type, is `422` on `certificate`) |
 | 422 | `validation_failed` | invalid input; `details` is `{ field: [messages] }` |
-| 429 | `rate_limited` | over the key's hourly limit (`Retry-After`) |
+| 429 | `rate_limited` | over the key's hourly limit, or more than 30 automatic submissions from the key in an hour (`Retry-After`) |
 
 ## 7. Webhooks
 
@@ -215,7 +216,7 @@ Common `data` fields: `verification_id`, `client_reference`, `request_type`, `st
 ```json
 { "event_id": "7a2c1e90-3b4d-4e8f-a1b2-c3d4e5f60718", "event_type": "training-verification.not_found", "occurred_at": "2026-10-28T19:54:09Z",
   "data": { "verification_id": 4822, "client_reference": null, "request_type": "auto", "status": "not_found",
-            "candidate_ref": null, "candidate_name": "Sam Jones", "reason_code": "candidate_not_found",
+            "candidate_ref": null, "candidate_name": "Sam Jones", "reason_code": "other",
             "created_at": "2026-10-28T19:53:24Z", "updated_at": "2026-10-28T19:54:09Z" } }
 ```
 

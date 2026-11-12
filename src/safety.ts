@@ -1,5 +1,6 @@
 import type { CatalogueOperation } from './catalogue.js';
 import { writesEnabled, type Config } from './config.js';
+import { howToConfirm } from './confirmation.js';
 import { SafetyRefusal } from './errors.js';
 
 export interface GateResult {
@@ -62,10 +63,50 @@ export interface WritePlan {
   destructive: boolean;
   idempotency_key: string | undefined;
   body: unknown;
+  /** Webhook create/update: the full destination URL (credentials removed), so the user sees where events will be sent. */
+  webhook_url?: string;
+  /** Set when a token the caller sent was refused (used, expired or for other arguments). */
+  token_problem?: string;
+  /** One-time token for the confirming call. Bound to this operation and these arguments. */
+  confirmation_token: string;
+  confirmation_expires_in_seconds: number;
   how_to_confirm: string;
 }
 
-export function buildPlan(op: CatalogueOperation, resolvedPath: string, body: unknown, idempotencyKey: string | undefined): WritePlan {
+const WEBHOOK_URL_OPERATIONS = new Set(['webhooks.endpoints.create', 'webhooks.endpoints.update']);
+
+export function isWebhookUrlOperation(op: CatalogueOperation): boolean {
+  return WEBHOOK_URL_OPERATIONS.has(op.id);
+}
+
+/**
+ * The destination of a webhook endpoint write: must be https, with no username or password. Returns the URL to show in the
+ * plan (the whole URL, query included, without credentials), or a problem text. `undefined` when the body carries no url
+ * (an update that leaves the URL alone).
+ */
+export function checkWebhookUrl(body: unknown): { url?: string; problem?: string } {
+  const raw = body && typeof body === 'object' ? (body as Record<string, unknown>).url : undefined;
+  if (raw === undefined || raw === null) return {};
+  if (typeof raw !== 'string') return { problem: 'url must be a string.' };
+  let u: URL;
+  try {
+    u = new URL(raw);
+  } catch {
+    return { problem: 'url is not a valid address.' };
+  }
+  if (u.protocol !== 'https:') return { problem: `the webhook url must use https (got ${u.protocol.replace(':', '')}). Nothing was sent.` };
+  if (u.username || u.password) return { problem: 'the webhook url must not contain a username or password. Nothing was sent.' };
+  return { url: u.href };
+}
+
+export function buildPlan(
+  op: CatalogueOperation,
+  resolvedPath: string,
+  body: unknown,
+  idempotencyKey: string | undefined,
+  confirmation: { token: string; expiresInSeconds: number; problem?: string },
+  webhookUrl?: string,
+): WritePlan {
   return {
     status: 'confirmation_required',
     executed: false,
@@ -82,10 +123,11 @@ export function buildPlan(op: CatalogueOperation, resolvedPath: string, body: un
     destructive: op.destructive,
     idempotency_key: idempotencyKey,
     body: body ?? null,
-    how_to_confirm:
-      'Nothing has been sent. Show this plan to the user. If they agree, call again with the same arguments plus confirm: true' +
-      (idempotencyKey ? ` and idempotency_key: "${idempotencyKey}"` : '') +
-      '.',
+    ...(webhookUrl ? { webhook_url: webhookUrl } : {}),
+    ...(confirmation.problem ? { token_problem: confirmation.problem } : {}),
+    confirmation_token: confirmation.token,
+    confirmation_expires_in_seconds: confirmation.expiresInSeconds,
+    how_to_confirm: howToConfirm(true, confirmation.token, idempotencyKey, confirmation.expiresInSeconds),
   };
 }
 
@@ -100,7 +142,7 @@ export function writeNote(config: Config, op: CatalogueOperation): string {
   }
   const parts: string[] = [];
   if (config.mode === 'live') {
-    parts.push('WRITE against the LIVE Hub: real data, real emails/credits. First call returns a plan; repeat with confirm=true to execute.');
+    parts.push('WRITE against the LIVE Hub: real data, real emails/credits. First call returns a plan and a one-time confirmation_token; repeat with that token (not confirm=true) to execute.');
   } else {
     parts.push('Write (sandbox: synthetic data).');
   }

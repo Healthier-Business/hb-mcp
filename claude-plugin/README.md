@@ -31,7 +31,16 @@ With a live key, Occupational Health and DBS & Right To Work (by default) need a
 
 ## Settings
 
-`HB_READ_ONLY` (default `true`), `HB_ALLOW_LIVE_WRITES` (default `false`), `HB_TOOL_MODE` (default `compact`), `HB_TASK_TOOLS` (default `all`; `core` or `none` to offer fewer task tools), `HB_UPLOAD_DIRS` (default empty: `hb_verify_certificate` may then read certificate files only from the folder Claude Code was started in; set a comma-separated list of absolute folders to allow others) and `HB_LOG_LEVEL` (default `warn`) are read from your shell environment if you set them. Everything else is in the [server documentation](https://github.com/Healthier-Business/hb-mcp#readme).
+Two optional plugin settings (change them with `/plugin configure hb-hub@healthier-business`):
+
+- **Certificate folders** (`HB_UPLOAD_DIRS`): the folders `hb_verify_certificate` may read training certificates from, as a comma-separated list of absolute paths. There is no default: while it is empty, certificate upload is switched off and every file is refused with a message that says so.
+- **Webhook secret folder** (`HB_SECRETS_DIR`): the one folder where a new webhook signing secret can be saved. Empty means `~/.config/hb-hub-mcp/secrets`. A secret is never saved anywhere else and an existing file is never overwritten.
+
+Live writes also need the one-time confirmation token the server issues with each plan: a `confirm: true` that Claude sends on its own does nothing on the live Hub.
+
+Shell environment settings:
+
+`HB_READ_ONLY` (default `true`), `HB_ALLOW_LIVE_WRITES` (default `false`), `HB_TOOL_MODE` (default `compact`), `HB_TASK_TOOLS` (default `all`; `core` or `none` to offer fewer task tools) and `HB_LOG_LEVEL` (default `warn`) are read from your shell environment if you set them. Everything else is in the [server documentation](https://github.com/Healthier-Business/hb-mcp#readme).
 
 ## Licence
 

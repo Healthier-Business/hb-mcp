@@ -1,4 +1,5 @@
-import { isAbsolute, resolve } from 'node:path';
+import { homedir } from 'node:os';
+import { isAbsolute, join, resolve } from 'node:path';
 import { z } from 'zod';
 import type { LogLevel } from './log.js';
 
@@ -27,8 +28,40 @@ export interface Config {
   maxResponseChars: number;
   requestTimeoutMs: number;
   webhookSecret: string | undefined;
-  /** Directories the server may read certificate files from (HB_UPLOAD_DIRS; default: the working directory only). */
+  /** Directories the server may read certificate files from (HB_UPLOAD_DIRS). Empty unless set: certificate upload is off until the owner lists a folder. */
   uploadDirs: string[];
+  /** The one directory new secret files (webhook signing secrets) may be written to (HB_SECRETS_DIR; default `<home config>/hb-hub-mcp/secrets`). */
+  secretsDir: string;
+}
+
+/** Where secret files go unless HB_SECRETS_DIR says otherwise: a dedicated folder under the user's config directory. */
+export function defaultSecretsDir(): string {
+  const base = process.env.XDG_CONFIG_HOME && isAbsolute(process.env.XDG_CONFIG_HOME) ? process.env.XDG_CONFIG_HOME : join(homedir(), '.config');
+  return join(base, 'hb-hub-mcp', 'secrets');
+}
+
+/** True for the Hub's own domain (hbcompliance.co.uk and its sub domains) and for local hosts. */
+export function isKnownHubHost(hostname: string): boolean {
+  const h = hostname.toLowerCase();
+  return h === 'hbcompliance.co.uk' || h.endsWith('.hbcompliance.co.uk') || h === 'localhost' || h === '127.0.0.1' || h === '[::1]' || h === '::1';
+}
+
+const warnedHosts = new Set<string>();
+
+/** For tests: forget which hosts were already warned about. */
+export function resetHostWarnings(): void {
+  warnedHosts.clear();
+}
+
+/**
+ * The API key and tokens are sent to HB_BASE_URL, so a host that is not the Hub or localhost deserves a warning on stderr
+ * (once per host and process). The server keeps working. Returns the warning, or undefined when there is nothing to say.
+ */
+export function baseUrlHostWarning(baseUrl: string): string | undefined {
+  const host = new URL(baseUrl).hostname;
+  if (isKnownHubHost(host) || warnedHosts.has(host)) return undefined;
+  warnedHosts.add(host);
+  return `HB_BASE_URL points at "${host}", which is not a hbcompliance.co.uk address, localhost or 127.0.0.1. Your Hub API key and tokens are sent to that host. Check HB_BASE_URL unless this is intended (for example a proxy).`;
 }
 
 export class ConfigError extends Error {}
@@ -66,6 +99,7 @@ const schema = z.object({
   HB_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1000).max(300_000).optional(),
   HB_WEBHOOK_SECRET: z.string().optional(),
   HB_UPLOAD_DIRS: z.string().optional(),
+  HB_SECRETS_DIR: z.string().optional(),
 });
 
 export function detectMode(baseUrl: string, hbEnv: Mode | undefined): { mode: Mode; source: Config['modeSource'] } {
@@ -122,7 +156,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     }
   }
 
-  let uploadDirs = [process.cwd()];
+  let uploadDirs: string[] = [];
   if (e.HB_UPLOAD_DIRS && e.HB_UPLOAD_DIRS.trim() !== '') {
     const listed = e.HB_UPLOAD_DIRS.split(',').map((s) => s.trim()).filter(Boolean);
     const relative = listed.filter((d) => !isAbsolute(d));
@@ -130,6 +164,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       throw new ConfigError(`HB_UPLOAD_DIRS must be a comma-separated list of absolute paths; not absolute: ${relative.join(', ')}`);
     }
     uploadDirs = listed.map((d) => resolve(d));
+  }
+
+  let secretsDir = defaultSecretsDir();
+  if (e.HB_SECRETS_DIR && e.HB_SECRETS_DIR.trim() !== '') {
+    if (!isAbsolute(e.HB_SECRETS_DIR.trim())) throw new ConfigError('HB_SECRETS_DIR must be an absolute path to a folder.');
+    secretsDir = resolve(e.HB_SECRETS_DIR.trim());
   }
 
   return {
@@ -147,6 +187,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     requestTimeoutMs: e.HB_REQUEST_TIMEOUT_MS ?? 30_000,
     webhookSecret: e.HB_WEBHOOK_SECRET?.trim() || undefined,
     uploadDirs,
+    secretsDir,
   };
 }
 

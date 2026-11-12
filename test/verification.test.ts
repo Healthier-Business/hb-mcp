@@ -96,9 +96,9 @@ describe('tool counts', () => {
 
 describe('HB_UPLOAD_DIRS setting', () => {
   const base = { HB_API_KEY: 'hbk_test_x1234567890' };
-  it('defaults to the working directory only', () => {
-    expect(loadConfig(base).uploadDirs).toEqual([process.cwd()]);
-    expect(loadConfig({ ...base, HB_UPLOAD_DIRS: '' }).uploadDirs).toEqual([process.cwd()]);
+  it('has no default: certificate upload is off until the owner lists a folder', () => {
+    expect(loadConfig(base).uploadDirs).toEqual([]);
+    expect(loadConfig({ ...base, HB_UPLOAD_DIRS: '' }).uploadDirs).toEqual([]);
   });
   it('takes a comma list of absolute folders and refuses anything else', () => {
     expect(loadConfig({ ...base, HB_UPLOAD_DIRS: '/srv/certs, /srv/more/' }).uploadDirs).toEqual(['/srv/certs', '/srv/more']);
@@ -192,8 +192,18 @@ describe('hb_verify_certificate: the two-step flow', () => {
     expect(creates(h)).toHaveLength(0);
   });
 
-  it('works from the working directory by default', async () => {
+  it('refuses with a clear how-to-set-it message when HB_UPLOAD_DIRS is not set, even for the working directory', async () => {
     h = await startHarness(WRITE_ENV);
+    const r = await h.call('hb_verify_certificate', { certificate_path: join(process.cwd(), 'test/fixtures/sample-certificate.pdf'), ...person });
+    expect(r.parts[0]).toContain('certificate upload is not set up');
+    expect(r.parts[0]).toContain('HB_UPLOAD_DIRS');
+    expect(r.parts[0]).toContain('There is no default folder');
+    expect(r.data.problems.length).toBeGreaterThan(0);
+    expect(creates(h)).toHaveLength(0);
+  });
+
+  it('works from the folder listed in HB_UPLOAD_DIRS (the test fixtures)', async () => {
+    h = await startHarness({ ...WRITE_ENV, HB_UPLOAD_DIRS: join(process.cwd(), 'test/fixtures') });
     const r = await h.call('hb_verify_certificate', { certificate_path: join(process.cwd(), 'test/fixtures/sample-certificate.pdf'), ...person });
     expect(r.isError).toBe(false);
     expect(r.parts[0]).toContain('sample-certificate.pdf');
@@ -333,9 +343,23 @@ describe('hb_verify_certificate: gates', () => {
     expect(plan.parts[0]).toContain('LIVE Hub');
     expect(plan.parts[0]).toContain('WILL be sent to verifications@example.com');
     expect(writes(h)).toHaveLength(0);
-    const sent = await h.call('hb_verify_certificate', { certificate_path: c.pdf, ...person, confirm: true, idempotency_key: plan.data.idempotency_key });
+    expect(plan.data.confirmation_token).toMatch(/^hbc_/);
+    const bare = await h.call('hb_verify_certificate', { certificate_path: c.pdf, ...person, confirm: true, idempotency_key: plan.data.idempotency_key });
+    expect(bare.data.stage).toBe('plan');
+    expect(creates(h)).toHaveLength(0);
+    const sent = await h.call('hb_verify_certificate', { certificate_path: c.pdf, ...person, file_sha256: plan.data.file.sha256, confirmation_token: bare.data.confirmation_token });
     expect(sent.isError).toBe(false);
     expect(creates(h)).toHaveLength(1);
+  });
+
+  it('a token is void when the file changed after the plan (bound to the SHA-256)', async () => {
+    const c = certificateDir();
+    h = await startHarness({ ...LIVE_WRITE_ENV, HB_UPLOAD_DIRS: c.dir });
+    const plan = await h.call('hb_verify_certificate', { certificate_path: c.pdf, ...person });
+    writeFileSync(c.pdf, Buffer.concat([Buffer.from('%PDF-1.4\n'), Buffer.from('a different certificate')]));
+    const sent = await h.call('hb_verify_certificate', { certificate_path: c.pdf, ...person, confirmation_token: plan.data.confirmation_token });
+    expect(sent.data.stage).toBe('plan');
+    expect(creates(h)).toHaveLength(0);
   });
 });
 
@@ -345,7 +369,7 @@ describe('hb_verify_certificate: path safety', () => {
     const plan = await h.call('hb_verify_certificate', { ...person, ...args });
     expect(plan.parts[0]).toMatch(expected);
     expect(plan.data.problems.length).toBeGreaterThan(0);
-    const confirmed = await h.call('hb_verify_certificate', { ...person, ...args, confirm: true });
+    const confirmed = await h.call('hb_verify_certificate', { ...person, ...args, confirm: true, confirmation_token: 'hbc_not-issued' });
     expect(confirmed.isError).toBe(true);
     expect(creates(h)).toHaveLength(0);
     expect(writes(h)).toHaveLength(0);
@@ -462,9 +486,9 @@ describe('hb_verify_certificate: path safety', () => {
     await refused({ HB_UPLOAD_DIRS: c.dir }, { certificate_path: join(sibling, 'c.pdf') }, /outside the directories/);
   });
 
-  it('with HB_UPLOAD_DIRS unset only the working directory is allowed', async () => {
+  it('with HB_UPLOAD_DIRS unset nothing is allowed', async () => {
     const c = certificateDir();
-    await refused({}, { certificate_path: c.pdf }, /outside the directories/);
+    await refused({}, { certificate_path: c.pdf }, /certificate upload is not set up/);
   });
 
   it('several folders can be allowed', async () => {

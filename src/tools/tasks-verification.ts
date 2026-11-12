@@ -68,9 +68,9 @@ export const verifyCertificateTool = writeTask<VerifyArgs>({
   name: 'hb_verify_certificate',
   title: 'Verify a training certificate',
   description:
-    'Ask Hub to verify one training certificate (a PDF, JPG or PNG file on this machine), in two calls. CALL 1 checks the file locally and sends nothing: it must be inside a folder allowed by HB_UPLOAD_DIRS (default: the server\'s working directory), not hidden, not a link out of that folder, of an accepted type and within the size limit; the plan shows the file name, size, type and SHA-256 (never the contents), who will be emailed the result, the price (Automated is FREE for regular accounts that use other Hub services, charged for verification-only accounts; Manual is charged for everyone; credits or wallet only, no card) and the credit balance. CALL 2 with confirm=true (and the same arguments) uploads the file with training-verification.verifications.create and reports the 202 result: the check runs afterwards, so follow it with hb_verification_status or the training-verification.* webhooks. The certificate is personal data: it is never shown, logged or returned. A charged request that the credits cannot pay is refused by the Hub (402) and nothing is stored. Uses training-verification.profile.show, .pricing.show, .credits.show and .verifications.create (multipart, with an idempotency key).',
+    'Ask Hub to verify one training certificate (a PDF, JPG or PNG file on this machine), in two calls. CALL 1 checks the file locally and sends nothing: it must be inside a folder listed in HB_UPLOAD_DIRS (no default: nothing is read until the owner sets it), not hidden, not a link out of that folder, of an accepted type and within the size limit; the plan shows the file name, size, type and SHA-256 (never the contents), who will be emailed the result, the price (Automated is FREE for regular accounts that use other Hub services, charged for verification-only accounts; Manual is charged for everyone; credits or wallet only, no card) and the credit balance. CALL 2 with the confirmation_token from call 1 (in a sandbox confirm=true also works) (and the same arguments) uploads the file with training-verification.verifications.create and reports the 202 result: the check runs afterwards, so follow it with hb_verification_status or the training-verification.* webhooks. The certificate is personal data: it is never shown, logged or returned. A charged request that the credits cannot pay is refused by the Hub (402) and nothing is stored. An Automated request is matched on the certificate names only: a miss always has the reason code `other` (the certificate could not be matched to a training record) and a verified result lists only the courses the certificate names. The Hub accepts at most 30 Automated submissions per key per hour (429 rate_limited: wait, then submit again). Uses training-verification.profile.show, .pricing.show, .credits.show and .verifications.create (multipart, with an idempotency key).',
   properties: {
-    certificate_path: { type: 'string', description: 'Absolute path of ONE certificate file inside an allowed folder (HB_UPLOAD_DIRS; default the server\'s working directory). Extensions .pdf .jpg .jpeg .png. No wildcards, no hidden files.' },
+    certificate_path: { type: 'string', description: 'Absolute path of ONE certificate file inside a folder listed in HB_UPLOAD_DIRS (no default; the owner must set it). Extensions .pdf .jpg .jpeg .png. No wildcards, no hidden files.' },
     request_type: { type: 'string', enum: ['auto', 'manual'], description: 'auto (default): Hub reads and matches the certificate. manual: Healthier Business staff check it (always charged).' },
     candidate_name: { type: 'string', description: 'The candidate\'s name as on the certificate.' },
     candidate_email: { type: 'string', description: 'The candidate\'s email address.' },
@@ -84,6 +84,7 @@ export const verifyCertificateTool = writeTask<VerifyArgs>({
   schema: verifyArgs,
   availability: { allOf: ['training-verification'] },
   idempotent: true,
+  confirmIgnore: ['file_sha256'],
   ops: () => ['training-verification.verifications.create'],
   plan: async (c) => {
     const { run, args } = c;
@@ -128,11 +129,13 @@ export const verifyCertificateTool = writeTask<VerifyArgs>({
       `Balance: ${credits.ok ? balanceText(balance ?? {}) : `could not be read (${why(credits)})`}.`,
       ...(price && !price.free ? [covered === false ? 'WARNING: the credits and balances look too small for this charge; the Hub will refuse it (402 insufficient_credits) and store nothing. Top up in the Hub first.' : 'It is charged once, from a verification credit, the older balance or the money balance (never a card), and refunded if cancelled while pending.'] : []),
       `Accepted files: ${types.map((t) => `.${t}`).join(', ')} up to ${formatSize(maxKb * 1024)}. The check runs after the upload (202): Automated usually finishes in minutes, Manual waits for staff.`,
+      ...(requestType === 'auto' ? ['Automated checks match on the certificate names only: if no training record matches, the result is not_found with the reason code other. The Hub allows 30 Automated submissions per key per hour (429 rate_limited over that).'] : []),
       'The certificate is personal data: it is sent to the Hub only, and never shown or logged here.',
     ];
     const result: PlanResult = {
       lines,
       problems,
+      binding: file.sha256,
       data: {
         file: { name: file.fileName, size_bytes: file.sizeBytes, content_type: file.contentType, sha256: file.sha256 },
         request_type: requestType,
@@ -168,7 +171,7 @@ export const verifyCertificateTool = writeTask<VerifyArgs>({
           c,
           'The certificate was not submitted',
           r,
-          r.status === 402 ? 'Nothing was stored or charged. Top up credits or the wallet in the Hub (no card is taken through the API), then repeat with confirm=true.' : undefined,
+          r.status === 402 ? 'Nothing was stored or charged. Top up credits or the wallet in the Hub (no card is taken through the API), then run the plan again and confirm it.' : undefined,
         );
       }
       const v = r.data ?? {};
@@ -219,7 +222,7 @@ export function verificationStatusTool(ctx: AppContext): TaskTool {
     definition: {
       name: 'hb_verification_status',
       description:
-        'Follow certificate verifications. With verification_id: that verification in full (status, request type, the result with the courses found and the reason code when not verified, the charge and whether it was refunded, the timeline of events, and whether the report and the certificate file are available). Without it: a list, newest first, filtered by status (pending, processing, verified, not_found, rejected, failed), request_type, candidate_ref, client_reference and created_from/created_to. Metadata only: the certificate file and the report are never fetched or returned (download them with the Hub API; the answer says how). Email addresses are left out. Read-only. Uses training-verification.verifications.list, .show and .events.',
+        'Follow certificate verifications. With verification_id: that verification in full (status, request type, the result with the courses found (for an Automated request only the courses the certificate names) and the reason code when not verified (an Automated request that cannot be matched always has the one reason `other`), the charge and whether it was refunded, the timeline of events, and whether the report and the certificate file are available). Without it: a list, newest first, filtered by status (pending, processing, verified, not_found, rejected, failed), request_type, candidate_ref, client_reference and created_from/created_to. Metadata only: the certificate file and the report are never fetched or returned (download them with the Hub API; the answer says how). Email addresses are left out. Read-only. Uses training-verification.verifications.list, .show and .events.',
       inputSchema: {
         type: 'object',
         properties: {

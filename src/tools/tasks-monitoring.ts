@@ -51,7 +51,7 @@ export const verifyWorkerTool = writeTask({
   name: 'hb_verify_worker',
   title: 'Add and verify a worker',
   description:
-    'Add a worker to DBS and right to work or to registration monitoring (param `portal`) and run the first check, or re-check or update the share code of an existing worker (worker_id), in two calls. CALL 1 validates the details, shows what personal data will be sent (certificate numbers and share codes only in masked form), the billing basis and trial status, and any worker with the same email; it sends nothing. CALL 2 with confirm=true creates the worker (idempotency key), asks for the verification, waits briefly for the job and reports the result. consent_given must be set to true by the user. Share codes and certificate numbers are never echoed back beyond a masked form, and are scrubbed from errors. Document uploads and passport images are not supported. Uses {portal}.workers.create/.show/.list/.verify/.share-code, {portal}.verify.job and {portal}.billing.usage.',
+    'Add a worker to DBS and right to work or to registration monitoring (param `portal`) and run the first check, or re-check or update the share code of an existing worker (worker_id), in two calls. CALL 1 validates the details, shows what personal data will be sent (certificate numbers and share codes only in masked form), the billing basis and trial status, and any worker with the same email; it sends nothing. CALL 2 with the confirmation_token from call 1 (in a sandbox confirm=true also works) creates the worker (idempotency key), asks for the verification, waits briefly for the job and reports the result. consent_given must be set to true by the user. Share codes and certificate numbers are never echoed back beyond a masked form, and are scrubbed from errors. Document uploads and passport images are not supported. Uses {portal}.workers.create/.show/.list/.verify/.share-code, {portal}.verify.job and {portal}.billing.usage.',
   properties: {
     portal: { type: 'string', enum: ['dbs-rtw', 'registration-monitoring'] },
     worker_id: { type: 'integer', description: 'An existing worker: re-check them (and set a new share code if given).' },
@@ -198,7 +198,7 @@ export const acknowledgeAlertsTool = writeTask({
   name: 'hb_acknowledge_alerts',
   title: 'Acknowledge or dismiss alerts',
   description:
-    'Acknowledge alerts in DBS and right to work or registration monitoring (one with alert_id, several with ids, every open alert of a type with type, or all open alerts only with all_open=true), or dismiss occupational health alerts (oh_action dismiss with oh_key, or clear to hide all shown alerts: shared with every Hub user, the requests themselves do not change). Two calls: CALL 1 lists exactly which alerts are affected and sends nothing; CALL 2 with confirm=true does it. Nobody is emailed. Occupational health alerts are shown as statuses only. Uses {portal}.alerts.list/.show/.acknowledge/.acknowledge-bulk and occupational-health.alerts.list/.dismiss/.clear.',
+    'Acknowledge alerts in DBS and right to work or registration monitoring (one with alert_id, several with ids, every open alert of a type with type, or all open alerts only with all_open=true), or dismiss occupational health alerts (oh_action dismiss with oh_key, or clear to hide all shown alerts: shared with every Hub user, the requests themselves do not change). Two calls: CALL 1 lists exactly which alerts are affected and sends nothing; CALL 2 with the confirmation_token from call 1 (in a sandbox confirm=true also works) does it. Nobody is emailed. Occupational health alerts are shown as statuses only. Uses {portal}.alerts.list/.show/.acknowledge/.acknowledge-bulk and occupational-health.alerts.list/.dismiss/.clear.',
   properties: {
     portal: { type: 'string', enum: ['dbs-rtw', 'registration-monitoring', 'occupational-health'] },
     alert_id: { type: 'integer', description: 'DBS/RTW or registration: acknowledge this alert.' },
@@ -307,7 +307,7 @@ export const bulkImportWorkersTool = writeTask({
   name: 'hb_bulk_import_workers',
   title: 'Bulk import workers from a CSV',
   description:
-    'Import workers from a CSV into DBS and right to work or registration monitoring (param `portal`), in two calls. CALL 1 uploads the file for a PREVIEW (nothing is imported) and returns the plan: row counts, valid and invalid rows, the first errors with their line numbers, the column mapping the Hub suggests; sample rows (personal data) are not shown. CALL 2 with the same arguments and confirm=true imports the file (idempotency key) and reports imported and failed counts. `file` is {filename, content_text} (or content_base64), max 10 MB. The preview call is a POST but changes nothing. Uses {portal}.imports.preview/.create/.show.',
+    'Import workers from a CSV into DBS and right to work or registration monitoring (param `portal`), in two calls. CALL 1 uploads the file for a PREVIEW (nothing is imported) and returns the plan: row counts, valid and invalid rows, the first errors with their line numbers, the column mapping the Hub suggests; sample rows (personal data) are not shown. CALL 2 with the same arguments and the confirmation_token (in a sandbox confirm=true also works) imports the file (idempotency key) and reports imported and failed counts. `file` is {filename, content_text} (or content_base64), max 10 MB. Only rows of the portal\'s own kind are imported: a DBS or right to work row in Registration Monitoring (or a registration in DBS & Right To Work) is rejected with a row error and counted as failed, and the Hub lists only the imports started in that portal. The preview call is a POST but changes nothing. Uses {portal}.imports.preview/.create/.show.',
   properties: {
     portal: { type: 'string', enum: ['dbs-rtw', 'registration-monitoring'] },
     file: { type: 'object', properties: { filename: { type: 'string' }, content_text: { type: 'string' }, content_base64: { type: 'string' }, content_type: { type: 'string' } }, required: ['filename'], description: 'The CSV: {"filename":"workers.csv","content_text":"first_name,last_name,..."}.' },
@@ -323,7 +323,7 @@ export const bulkImportWorkersTool = writeTask({
   ops: (a) => [`${a.portal}.imports.preview`, `${a.portal}.imports.create`, `${a.portal}.imports.show`],
   plan: async (c) => {
     const { run, args } = c;
-    const pre = await run.call(`${args.portal}.imports.preview`, { body: importBody(args), confirm: true }, { noPrecheck: true });
+    const pre = await run.call(`${args.portal}.imports.preview`, { body: importBody(args), confirmed: true }, { noPrecheck: true });
     if (!pre.ok) return { lines: [`The preview failed: ${why(pre)}.`, ...(pre.error ? [pre.error.split('\n').slice(0, 6).join('\n')] : [])], problems: ['the file could not be previewed.'] };
     const p = pre.data ?? {};
     const errors: Json[] = Array.isArray(p.errors) ? p.errors : [];

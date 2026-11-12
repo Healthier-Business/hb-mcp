@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { loadConfig, ConfigError, DEFAULT_BASE_URL } from './config.js';
+import { baseUrlHostWarning, loadConfig, ConfigError, DEFAULT_BASE_URL } from './config.js';
 import { SERVER_VERSION } from './context.js';
 import { runDoctor } from './doctor.js';
 import { startHttpServer } from './http-transport.js';
@@ -28,7 +28,8 @@ Environment
   HB_MAX_RESPONSE_CHARS   cap on a tool answer, default 60000
   HB_REQUEST_TIMEOUT_MS   default 30000
   HB_WEBHOOK_SECRET       default secret for hb_verify_webhook_signature
-  HB_UPLOAD_DIRS          comma list of absolute directories hb_verify_certificate may read certificate files from (default: the working directory only)
+  HB_UPLOAD_DIRS          comma list of absolute directories hb_verify_certificate may read certificate files from (no default: certificate upload is off until you set it)
+  HB_SECRETS_DIR          the one absolute directory new webhook secret files (save_secret_to) are written to (default ~/.config/hb-hub-mcp/secrets)
   HB_MCP_HTTP_TOKEN       bearer token required by --http when not on loopback
   HB_MCP_HTTP_PORT, HB_MCP_HTTP_HOST   defaults for --http
 
@@ -58,6 +59,8 @@ async function main(): Promise<void> {
     process.stderr.write(`Configuration error: ${e instanceof ConfigError ? e.message : String(e)}\n`);
     process.exit(2);
   }
+  const hostWarning = baseUrlHostWarning(config.baseUrl);
+  if (hostWarning) process.stderr.write(`[hb-hub-mcp] warning ${hostWarning}\n`);
   setLogLevel(config.logLevel);
   redactor.add(config.apiKey);
   redactor.add(config.webhookSecret);

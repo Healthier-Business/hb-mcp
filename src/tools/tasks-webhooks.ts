@@ -1,8 +1,6 @@
-import { existsSync } from 'node:fs';
-import { dirname, isAbsolute } from 'node:path';
 import { z } from 'zod';
 import { redactor } from './../redact.js';
-import { safeUrl, rows, saveSecretFile, when, why, type Json } from './task-support.js';
+import { checkSecretTarget, safeUrl, rows, saveSecretFile, when, why, type Json } from './task-support.js';
 import { done, failed, send, writeBase, writeTask, type WriteCtx } from './task-kit.js';
 
 // ----------------------------------------------------------------------------- hb_redeliver_webhooks
@@ -18,7 +16,7 @@ export const redeliverWebhooksTool = writeTask({
   name: 'hb_redeliver_webhooks',
   title: 'Redeliver failed webhooks',
   description:
-    'Send failed webhook deliveries again to the same endpoint, in two calls. CALL 1 shows the endpoint (active or switched off) and exactly which deliveries will be redelivered (the failed ones, newest first, or the delivery_ids you give) and sends nothing. CALL 2 with confirm=true redelivers them one by one. The same event_id is kept, so a receiver that ignores event ids it has handled stays correct. Each call queues a new series of up to 5 attempts and the Hub has no idempotency key here, so do not repeat it blindly. An endpoint that is switched off must be switched on first (the plan says so). Uses webhooks.endpoints.show, .deliveries.list and .deliveries.redeliver.',
+    'Send failed webhook deliveries again to the same endpoint, in two calls. CALL 1 shows the endpoint (active or switched off) and exactly which deliveries will be redelivered (the failed ones, newest first, or the delivery_ids you give) and sends nothing. CALL 2 with the confirmation_token from call 1 (in a sandbox confirm=true also works) redelivers them one by one. The same event_id is kept, so a receiver that ignores event ids it has handled stays correct. Each call queues a new series of up to 5 attempts and the Hub has no idempotency key here, so do not repeat it blindly. An endpoint that is switched off must be switched on first (the plan says so). Uses webhooks.endpoints.show, .deliveries.list and .deliveries.redeliver.',
   properties: {
     endpoint_id: { type: 'integer', description: 'The webhook endpoint id.' },
     delivery_ids: { type: 'array', items: { type: 'integer' }, description: 'Redeliver exactly these deliveries (default: the failed ones).' },
@@ -78,10 +76,10 @@ export const rotateWebhookSecretTool = writeTask({
   name: 'hb_rotate_webhook_secret',
   title: 'Rotate a webhook signing secret',
   description:
-    'Create a new signing secret for a webhook endpoint, in two calls. CALL 1 shows the endpoint and warns what rotation does: the old secret stops working at once, every delivery from then on (including queued retries for up to about 80 minutes) is signed with the new one, and a receiver that still holds the old secret will reject them until it is updated. Nothing is changed. CALL 2 with confirm=true rotates it, on sandbox and live alike. The new secret is NEVER returned in the answer (withheld and scrubbed, as in hb_setup_sandbox_webhook): pass save_secret_to (an absolute path to a NEW file, owner-only, on the machine running this server) to keep it, then put its content in the receiver and in HB_WEBHOOK_SECRET. If you do not save it, you must rotate again to get one. Not idempotent: do not repeat after a lost answer. Uses webhooks.endpoints.show and webhooks.endpoints.rotate-secret.',
+    'Create a new signing secret for a webhook endpoint, in two calls. CALL 1 shows the endpoint and warns what rotation does: the old secret stops working at once, every delivery from then on (including queued retries for up to about 80 minutes) is signed with the new one, and a receiver that still holds the old secret will reject them until it is updated. Nothing is changed. CALL 2 with the confirmation_token from call 1 (in a sandbox confirm=true also works) rotates it, on sandbox and live alike. The new secret is NEVER returned in the answer (withheld and scrubbed, as in hb_setup_sandbox_webhook): pass save_secret_to (a new file name; it is written owner-only into the secrets folder HB_SECRETS_DIR on the machine running this server, default ~/.config/hb-hub-mcp/secrets) to keep it, then put its content in the receiver and in HB_WEBHOOK_SECRET. If you do not save it, you must rotate again to get one. Not idempotent: do not repeat after a lost answer. Uses webhooks.endpoints.show and webhooks.endpoints.rotate-secret.',
   properties: {
     endpoint_id: { type: 'integer', description: 'The webhook endpoint id.' },
-    save_secret_to: { type: 'string', description: 'Absolute path of a new file to write the new signing secret to (owner-only). Strongly recommended.' },
+    save_secret_to: { type: 'string', description: 'A new file name (for example "webhook-secret.txt"); it is written owner-only into the secrets folder (HB_SECRETS_DIR). Strongly recommended.' },
   },
   required: ['endpoint_id'],
   schema: rotateArgs,
@@ -102,10 +100,9 @@ export const rotateWebhookSecretTool = writeTask({
       'The new secret is never shown in the answer.',
     ];
     if (args.save_secret_to) {
-      if (!isAbsolute(args.save_secret_to)) problems.push('save_secret_to must be an absolute path.');
-      else if (!existsSync(dirname(args.save_secret_to))) problems.push('the folder for save_secret_to does not exist.');
-      else if (existsSync(args.save_secret_to)) problems.push('save_secret_to already exists; the server never overwrites files.');
-      else lines.push(`The new secret will be saved to ${args.save_secret_to} (owner-only).`);
+      const target = checkSecretTarget(c.ctx.config, args.save_secret_to);
+      if ('problem' in target) problems.push(target.problem);
+      else lines.push(`The new secret will be saved to ${target.path} (owner-only, in the secrets folder).`);
     } else lines.push('WARNING: no save_secret_to, so the new secret would be lost and you would have to rotate again to get one. Pass save_secret_to (a new file path) unless you only want to invalidate the old secret.');
     return { lines, problems, data: { endpoint: { id: e.id, name: e.name, url: safeUrl(e.url) } } };
   },
@@ -126,9 +123,9 @@ export const rotateWebhookSecretTool = writeTask({
     let saved = false;
     let line: string;
     if (secret && args.save_secret_to) {
-      const problem = await saveSecretFile(args.save_secret_to, secret);
-      saved = problem === undefined;
-      line = saved ? `The new secret was saved to ${args.save_secret_to} (owner-only). It is not shown here. Update the receiver now.` : `The secret was rotated but could NOT be saved (${problem}); it is lost and withheld. Rotate again with a valid save_secret_to.`;
+      const result = await saveSecretFile(c.ctx.config, args.save_secret_to, secret);
+      saved = result.saved;
+      line = result.saved ? `The new secret was saved to ${result.path} (owner-only). It is not shown here. Update the receiver now.` : `The secret was rotated but could NOT be saved (${result.problem}); it is lost and withheld. Rotate again with a valid save_secret_to.`;
     } else line = 'The secret was rotated and is withheld from this answer. It was not saved: rotate again with save_secret_to to obtain one.';
     return done(c, [`Endpoint #${args.endpoint_id} rotated; new secret prefix ${r.body?.secret_prefix ?? '-'}.`, line], { endpoint_id: args.endpoint_id, secret_prefix: r.body?.secret_prefix, signing_secret: 'withheld', secret_saved_to_file: saved });
   },

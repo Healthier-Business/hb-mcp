@@ -1,12 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import type { CatalogueOperation, OperationCatalogue } from './catalogue.js';
 import type { Config } from './config.js';
+import { explainFailure, type ConfirmationStore } from './confirmation.js';
 import { HubApiError, HubNetworkError, ToolInputError, describeError } from './errors.js';
 import type { HubClient, HubRequest, HubResponse } from './http.js';
 import { capOutput, selectFields } from './output.js';
 import { redactor } from './redact.js';
 import { formatIssues, validate } from './schema.js';
-import { buildPlan, gate, isWrite } from './safety.js';
+import { buildPlan, checkWebhookUrl, gate, isWebhookUrlOperation, isWrite } from './safety.js';
 import { textResult, type ToolResult } from './tools/types.js';
 
 export interface CallArgs {
@@ -14,7 +15,12 @@ export interface CallArgs {
   query?: Record<string, unknown>;
   body?: unknown;
   headers?: Record<string, unknown>;
+  /** Model-supplied. In the sandbox it confirms a write; on the LIVE Hub it does nothing (only `confirmation_token` does). */
   confirm?: boolean;
+  /** Model-supplied: the one-time token from the plan of the same call. */
+  confirmation_token?: string;
+  /** In-process only, never a tool argument: the calling task tool already holds a validated confirmation for this write. */
+  confirmed?: boolean;
   all_pages?: boolean;
   max_pages?: number;
   fields?: string[];
@@ -44,6 +50,7 @@ export class Executor {
     private readonly config: Config,
     readonly catalogue: OperationCatalogue,
     private readonly client: HubClient,
+    private readonly confirmations: ConfirmationStore,
   ) {}
 
   async call(operationId: string, args: CallArgs): Promise<ToolResult> {
@@ -159,12 +166,26 @@ export class Executor {
 
   private async run(op: CatalogueOperation, args: CallArgs): Promise<ToolResult> {
     const { needsConfirm } = gate(this.config, op);
-    const { req, body, idempotencyKey } = this.buildRequest(op, args);
+    const planned = needsConfirm && args.confirmed !== true;
+    const effective: CallArgs = planned && !args.idempotency_key ? { ...args, idempotency_key: this.confirmations.peekIdempotencyKey(args.confirmation_token) } : args;
+    const { req, body, idempotencyKey } = this.buildRequest(op, effective);
     this.lastKey = idempotencyKey;
 
-    if (needsConfirm && args.confirm !== true) {
-      const plan = buildPlan(op, `${req.path}`, body, idempotencyKey);
-      return textResult(redactor.redact(JSON.stringify(plan, null, 1)));
+    let webhookUrl: string | undefined;
+    if (isWrite(op) && isWebhookUrlOperation(op)) {
+      const checked = checkWebhookUrl(body);
+      if (checked.problem) throw new ToolInputError(`The call to ${op.id} was not sent: ${checked.problem}`, [checked.problem]);
+      webhookUrl = checked.url;
+    }
+
+    if (planned) {
+      const payload = { path_params: args.path_params ?? {}, query: args.query ?? {}, body: args.body ?? null, headers: args.headers ?? {} };
+      const used = this.confirmations.consume(args.confirmation_token, op.id, payload);
+      if (!used.ok) {
+        const issued = this.confirmations.issue(op.id, payload, { idempotencyKey });
+        const plan = buildPlan(op, `${req.path}`, body, idempotencyKey, { ...issued, problem: explainFailure(used.reason) || undefined }, webhookUrl);
+        return textResult(redactor.redact(JSON.stringify(plan, null, 1)));
+      }
     }
 
     const wantPages = args.all_pages === true && op.paginated && op.method === 'GET';

@@ -21,7 +21,7 @@ export function buildPrompts(ctx: AppContext): PromptDefinition[] {
   const env = ctx.config.mode.toUpperCase();
   const writeLine = writesEnabled(ctx.config)
     ? ctx.config.mode === 'live'
-      ? 'Writes are enabled on the LIVE Hub: show the plan from the first call and wait for the user\'s yes before confirm=true.'
+      ? 'Writes are enabled on the LIVE Hub: show the plan from the first call and wait for the user\'s yes before sending the confirmation_token from the plan.'
       : 'Writes are enabled in this sandbox.'
     : 'The server is read-only, so stop and tell the user what would be needed (HB_READ_ONLY=false, preferably in a sandbox) instead of trying to write.';
 
@@ -38,14 +38,14 @@ export function buildPrompts(ctx: AppContext): PromptDefinition[] {
       build: (a) =>
         [
           `Book a practical training for: ${a.candidate}${a.course ? `, course: ${a.course}` : ''}${a.dates ? `, dates: ${a.dates}` : ''}. Environment: ${env}. ${writeLine}`,
-          'Prefer the task tools: hb_find_candidate to find the person, then hb_book_practical_training (call 1 returns session options and the plan and sends nothing; call 2 with event_id, pay_option, the agency contact and confirm=true books). The generic steps below are the fallback.',
+          'Prefer the task tools: hb_find_candidate to find the person, then hb_book_practical_training (call 1 returns session options and the plan and sends nothing; call 2 with event_id, pay_option, the agency contact and the confirmation_token (confirm=true in a sandbox) books). The generic steps below are the fallback.',
           '1. hb_status (or the status tool) to confirm environment and that the key has practical-training:bookings:write and hub:candidates:read.',
           `2. Find the candidate with ${call('hub.candidates.list')} using query {"search": "..."}; take their candidate_ref. If several match, ask the user which one. Never guess a candidate_ref.`,
           `3. ${call('practical-training.courses.list')} to find the course; ${call('practical-training.events.list')} with available_only=true and a date range to find sessions with free places; ${call('practical-training.locations.list')} if location matters.`,
           `4. ${call('practical-training.credits.show')}: check booking credits and balance. Credits are units; the balance is pence.`,
           `5. Describe the booking operation (practical-training.bookings.create) to see pay_option choices and required fields. Optionally hold a place first (practical-training.events.hold).`,
           `6. Summarise: candidate, course, session, date, location, pay_option and what it costs. Ask the user to confirm.`,
-          `7. Create the booking with ${call('practical-training.bookings.create')}. In live the first call returns a plan; repeat with confirm=true after approval. Report the booking id and request_id.`,
+          `7. Create the booking with ${call('practical-training.bookings.create')}. In live the first call returns a plan; repeat with the confirmation_token from the plan after approval. Report the booking id and request_id.`,
         ].join('\n'),
     },
     {
@@ -116,7 +116,7 @@ export function buildPrompts(ctx: AppContext): PromptDefinition[] {
           'Run hb_go_live_check first (pass the portals the integration needs): it reports environment, scopes, webhooks and the remaining steps. Read hb://guides/going-live and hb://guides/testing-and-sandbox. Then check, one item at a time, and report pass/fail:',
           '1. Everything worked in a sandbox: list the flows tested and the error cases (402, 403, 404, 409, 422, 429) handled.',
           '2. A new LIVE key exists with only the scopes the integration needs (least privilege), and an IP allowlist if appropriate. With the stdio transport the calls leave from the developer\'s own machine, so that machine\'s public IP is what the allowlist sees.',
-          '3. Switch the server: HB_BASE_URL (or remove it for the default https://hub.hbcompliance.co.uk), HB_API_KEY = the live key, restart the client. Keep HB_READ_ONLY=true until the owner is ready; live writes also need HB_ALLOW_LIVE_WRITES=true and confirm=true per write.',
+          '3. Switch the server: HB_BASE_URL (or remove it for the default https://hub.hbcompliance.co.uk), HB_API_KEY = the live key, restart the client. Keep HB_READ_ONLY=true until the owner is ready; live writes also need HB_ALLOW_LIVE_WRITES=true and the one-time confirmation_token from each plan per write.',
           '4. Run hb_status and confirm environment LIVE and the expected scopes. Check api_access too: Occupational Health and DBS & Right To Work (by default) need the Hub\'s one-off approval before live calls and webhook events work; a user of the organisation asks in the Hub under Developer > API access, and a refused area answers 403 api_access_*.',
           '5. Webhooks: register the endpoint again in live (new signing secret), verify signatures, dedupe on X-Hub-Event-Id.',
           '6. Identifiers: sandbox candidate_refs and ids mean nothing in live. Look up or create real candidates; never copy ids across.',
@@ -138,7 +138,7 @@ export function buildPrompts(ctx: AppContext): PromptDefinition[] {
           `Add candidate ${a.first_name} ${a.last_name} <${a.email}>. Environment: ${env}. ${writeLine}`,
           `1. ${call('hub.candidates.list')} with {"search": "${a.email}"} to check they do not exist (email must be unique per client).`,
           `2. Describe hub.candidates.create. Creating a candidate emails them an activation link unless is_active is false: say so to the user.`,
-          `3. ${call('hub.candidates.create')} with body {first_name, last_name, email}. In live, show the plan and wait for the user's yes before confirm=true.`,
+          `3. ${call('hub.candidates.create')} with body {first_name, last_name, email}. In live, show the plan and wait for the user's yes before sending the confirmation_token from the plan.`,
           '4. Report the candidate_ref; use that for everything after.',
         ].join('\n'),
     },
@@ -159,7 +159,7 @@ export function buildPrompts(ctx: AppContext): PromptDefinition[] {
           '1. hb_status (or the status tool): confirm the environment and that the key has training-verification:write (it also reads). If the account has no Training Verification, every call is 403 portal_unavailable.',
           `2. Price and balance: the plan of hb_verify_certificate shows them (it reads ${call('training-verification.profile.show')}, ${call('training-verification.pricing.show')} and ${call('training-verification.credits.show')}). Automated (auto) is FREE for a regular account (one that also uses other Hub services) and charged for a verification-only account; Manual is charged for everyone; credits or the wallet pay, never a card. Tell the user the price before going on, and whether the balance covers it (a shortfall is 402 insufficient_credits: top up in the Hub).`,
           `3. File check and plan: call hb_verify_certificate with certificate_path, request_type (default auto), candidate_name, candidate_email, agency_name_on_cert and, if needed, notify_email, candidate_ref (from hb_find_candidate) and client_reference, WITHOUT confirm. It checks the file locally (it must be inside HB_UPLOAD_DIRS, not hidden, a .pdf, .jpg, .jpeg or .png within the size limit) and sends nothing. Ask the user for any missing detail; never invent an email address. Show the plan: file name, size, SHA-256, who gets the result email, price and balance.`,
-          '4. After the user says yes, call the same tool again with the same arguments, the idempotency_key from the plan, file_sha256 from the plan and confirm=true. The answer is 202 with the verification id and status pending. Repeating with the same idempotency_key never charges twice.',
+          '4. After the user says yes, call the same tool again with the same arguments, the idempotency_key from the plan, file_sha256 from the plan and the confirmation_token (confirm=true in a sandbox). The answer is 202 with the verification id and status pending. Repeating with the same idempotency_key never charges twice.',
           '5. Follow it: hb_verification_status with verification_id shows the status (pending, processing, verified, not_found, rejected, failed), the result and the timeline. Automated usually finishes in minutes; Manual stays processing until staff decide. A pending verification can be cancelled with hb_change_booking (portal training-verification, booking_id = the verification id), which refunds a charge.',
           `6. Webhooks (optional): events training-verification.submitted, .processing, .verified, .not_found, .rejected, .failed and .refunded, each once per verification, carrying ids, status, reason code and the candidate name but never the certificate. In a sandbox hb_setup_sandbox_webhook subscribes them all when the key has a training-verification scope; verify deliveries with hb_verify_webhook_signature. ${call('training-verification.verifications.report')} (a PDF, once verified) and ${call('training-verification.verifications.certificate')} download files: use hb_get_report for how, and do not print them.`,
         ].join('\n'),

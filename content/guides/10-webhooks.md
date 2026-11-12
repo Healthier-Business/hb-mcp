@@ -50,11 +50,11 @@ The other endpoint-management calls are:
 | --- | --- |
 | `GET /webhooks` | List your endpoints. Filters `is_active`, `search`, `created_from`, `created_to`. Sort by `id`, `name` or `created_at` |
 | `GET /webhooks/{id}` | Read one endpoint |
-| `PUT /webhooks/{id}` | Change the fields you send. Send `is_active: true` to switch a disabled endpoint back on |
+| `PUT /webhooks/{id}` | Change the fields you send. Send `is_active: true` to switch a disabled endpoint back on. Changing the `url`, or switching an inactive endpoint on, needs a key that can read every portal of the events the endpoint sends, otherwise `422 validation_failed` on `events.N` |
 | `DELETE /webhooks/{id}` | Delete the endpoint. Events stop being sent at once |
 | `GET /webhooks/events` | List every event you can choose, grouped by portal |
 | `POST /webhooks/{id}/test` | Send a test event |
-| `POST /webhooks/{id}/rotate-secret` | Create a new signing secret |
+| `POST /webhooks/{id}/rotate-secret` | Create a new signing secret. The key must be able to read every portal of the endpoint's events, otherwise `422 validation_failed` on `events.N` |
 | `GET /webhooks/{id}/deliveries` | List the delivery attempts of an endpoint |
 | `POST /webhooks/{id}/deliveries/{delivery}/redeliver` | Send an event again |
 

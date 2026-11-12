@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
+import { decide, howToConfirm } from '../confirmation.js';
 import type { JsonObject } from '../generator/build.js';
 import type { AppContext } from '../context.js';
 import { SafetyRefusal } from '../errors.js';
@@ -20,11 +21,13 @@ import type { ToolResult } from './types.js';
 /** Fields every write task tool accepts. */
 export const writeBase = {
   confirm: z.boolean().optional(),
+  confirmation_token: z.string().max(200).optional(),
   idempotency_key: z.string().max(200).optional(),
 };
 
 const writeBaseProperties: JsonObject = {
-  confirm: { type: 'boolean', description: 'true only after the user approved the plan returned by the first call. Without it nothing is changed.' },
+  confirm: { type: 'boolean', description: 'Sandbox only: true after the user approved the plan returned by the first call. On the LIVE Hub this does nothing: use confirmation_token. Without confirmation nothing is changed.' },
+  confirmation_token: { type: 'string', description: 'LIVE Hub: the one-time token from the plan the first call returned. Send it, with the same arguments, only after the user approved that plan. It works once, for those exact arguments, for ten minutes.' },
   idempotency_key: { type: 'string', description: 'Reuse the key returned by an earlier call to repeat a write safely.' },
 };
 
@@ -44,9 +47,11 @@ export interface PlanResult {
   problems?: string[];
   /** The action only reads (for example listing): return the lines as the answer, no confirm needed. */
   readOnlyAction?: boolean;
+  /** Something the plan worked out that the confirmation must still match (for example a file's SHA-256), so a token is void if it changed. */
+  binding?: string;
 }
 
-export interface WriteSpec<A extends { confirm?: boolean; idempotency_key?: string }> {
+export interface WriteSpec<A extends { confirm?: boolean; confirmation_token?: string; idempotency_key?: string }> {
   name: string;
   title: string;
   description: string;
@@ -62,13 +67,15 @@ export interface WriteSpec<A extends { confirm?: boolean; idempotency_key?: stri
   execute: (c: WriteCtx<A>, plan: PlanResult) => Promise<ToolResult>;
   destructive?: boolean;
   idempotent?: boolean;
+  /** Arguments the plan itself hands back (for example a file hash), so the confirming call adds them: left out of what a token is bound to. */
+  confirmIgnore?: readonly string[];
 }
 
 export const keyFor = (c: { key: string }, tag: string): string => `${c.key}-${tag}`;
 
-/** Send one write operation of a confirmed task. The tool-level confirm is the user's approval for the live gate. */
+/** Send one write operation of a confirmed task. The tool-level confirmation (a valid token on live) is the approval for the live gate. */
 export function send(c: WriteCtx<unknown>, op: string, args: Record<string, unknown>, tag = op.split('.').pop() ?? 'w'): Promise<CallOutcome> {
-  return c.run.call(op, { ...args, confirm: true, idempotency_key: keyFor(c, tag) }, { noPrecheck: true });
+  return c.run.call(op, { ...args, confirmed: true, idempotency_key: keyFor(c, tag) }, { noPrecheck: true });
 }
 
 export function done(c: WriteCtx<unknown>, lines: string[], data: Record<string, unknown>): ToolResult {
@@ -89,7 +96,7 @@ export function failed(c: WriteCtx<unknown>, what: string, r: CallOutcome, extra
 }
 
 /** Build a write task tool: validate, gate, scope check, plan (reads only), then act only on confirm. */
-export function writeTask<A extends { confirm?: boolean; idempotency_key?: string }>(spec: WriteSpec<A>) {
+export function writeTask<A extends { confirm?: boolean; confirmation_token?: string; idempotency_key?: string }>(spec: WriteSpec<A>) {
   return (ctx: AppContext): TaskTool => ({
     availability: { ...spec.availability, writes: true },
     definition: {
@@ -112,7 +119,7 @@ export function writeTask<A extends { confirm?: boolean; idempotency_key?: strin
         await run.loadKey();
         const lacking = missingScopes(ctx, needed, run);
         if (lacking.length) return refusal(`The key lacks the scope(s) ${lacking.join(', ')}, so this cannot be done. Ask the user to add them to the key on the Hub Developer page. Nothing was sent.`);
-        const key = args.idempotency_key ?? randomUUID();
+        const key = args.idempotency_key ?? ctx.confirmations.peekIdempotencyKey(args.confirmation_token) ?? randomUUID();
         const c: WriteCtx<A> = { ctx, run, args, key, live: ctx.config.mode === 'live' };
         const plan = await spec.plan(c);
 
@@ -120,15 +127,25 @@ export function writeTask<A extends { confirm?: boolean; idempotency_key?: strin
           return taskResult(ctx, run, { lines: [environmentLine(ctx), ...plan.lines, `Operations called: ${run.operationsCalled().join(', ')}.`], data: { executed: false, stage: 'read', ...plan.data } });
         }
         const problems = plan.problems ?? [];
-        if (args.confirm !== true) {
+        const decision = decide(ctx.confirmations, {
+          live: c.live,
+          tool: spec.name,
+          args: args as Record<string, unknown>,
+          ignore: spec.confirmIgnore,
+          binding: plan.binding,
+          idempotencyKey: key,
+          issueToken: problems.length === 0,
+        });
+        if (!decision.confirmed) {
           const lines = [
             environmentLine(ctx),
             ...plan.lines,
             ...(problems.length ? [`Cannot proceed yet: ${problems.join(' ')}`] : []),
-            `Nothing was sent. To proceed, call again with the same arguments plus confirm=true and idempotency_key "${key}", after the user agrees.`,
+            ...(decision.rejected ? [`${decision.rejected} A new plan was made.`] : []),
+            problems.length ? `Nothing was sent. Fix the above, then call again for a new plan.` : `${howToConfirm(c.live, decision.token, key, decision.expiresInSeconds)}`,
             `Operations called: ${run.operationsCalled().join(', ')}.`,
           ];
-          return taskResult(ctx, run, { lines, data: { executed: false, stage: 'plan', problems, idempotency_key: key, ...plan.data } });
+          return taskResult(ctx, run, { lines, data: { executed: false, stage: 'plan', problems, idempotency_key: key, ...(decision.token ? { confirmation_token: decision.token, confirmation_expires_in_seconds: decision.expiresInSeconds } : {}), ...plan.data } });
         }
         if (problems.length) return refusal(`Cannot proceed: ${problems.join(' ')} Nothing was changed.`);
         return spec.execute(c, plan);

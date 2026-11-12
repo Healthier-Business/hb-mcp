@@ -87,12 +87,13 @@ A few routes have their own per-minute throttle in addition to the hourly limit.
 | Virtual BLS Training, all endpoints | 120 a minute | The access token |
 | Clinical Interviews, all endpoints | 120 a minute | The access token |
 | Clinical Appraisals, all endpoints | 120 a minute | The access token |
+| Training Verification: `POST /verifications` with `request_type` `auto` | 30 an hour | The key |
 | Occupational Health: `POST /candidates/{candidate_ref}/reminder` | 20 a minute | The key |
 | Occupational Health: `POST /reports/{type}/generate` | 10 a minute | The key |
 
 The Hub core API, Online Training, References, Registration Monitoring, DBS and Right To Work have no per-minute throttle beyond the hourly limit. The Clinical Interviews slot-hold endpoint additionally has abuse limits that can answer `429` with the codes `too_fast`, `client_limit` or `ip_limit`. They are not tied to your hourly allowance, and guard against slot-hoarding. See [errors](08-errors.md).
 
-These per-minute limits are far above what a normal integration needs. Reaching one almost always means a loop or a retry storm.
+An automatic Training Verification submission over its hourly limit of 30 per key is answered `429 rate_limited` with `Retry-After`; wait, then submit again (manual requests are not limited this way). The other limits in this table are per minute and are far above what a normal integration needs. Reaching one almost always means a loop or a retry storm.
 
 ## Staying inside the limits
 

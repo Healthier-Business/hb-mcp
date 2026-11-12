@@ -24,6 +24,7 @@ const callArgs = z.object({
   body: z.unknown().optional(),
   headers: z.record(z.string(), z.unknown()).optional(),
   confirm: z.boolean().optional(),
+  confirmation_token: z.string().max(200).optional(),
   all_pages: z.boolean().optional(),
   max_pages: z.number().int().min(1).max(20).optional(),
   fields: z.array(z.string()).optional(),
@@ -52,7 +53,7 @@ export function summariseOperation(ctx: AppContext, op: CatalogueOperation) {
   };
 }
 
-function exampleCall(op: CatalogueOperation) {
+function exampleCall(ctx: AppContext, op: CatalogueOperation) {
   const path_params: Record<string, string> = {};
   for (const p of op.parameters.filter((x) => x.in === 'path')) path_params[p.name] = `<${p.name}>`;
   return {
@@ -60,7 +61,8 @@ function exampleCall(op: CatalogueOperation) {
     path_params: Object.keys(path_params).length ? path_params : undefined,
     query: op.paginated ? { per_page: 25 } : undefined,
     body: op.body?.example ?? undefined,
-    confirm: isWrite(op) ? '(true only after the user approved the plan; required in live)' : undefined,
+    confirmation_token: isWrite(op) && ctx.config.mode === 'live' ? '(live writes: the token returned by the first call, sent only after the user approved the plan)' : undefined,
+    confirm: isWrite(op) && ctx.config.mode !== 'live' ? '(true to confirm in a sandbox)' : undefined,
   };
 }
 
@@ -84,9 +86,9 @@ export function describeOperation(ctx: AppContext, op: CatalogueOperation) {
       health_data: op.healthData,
       destructive: op.destructive,
       idempotency: op.hasIdempotencyKey ? 'Send an Idempotency-Key (the server generates one). The same key and body within 24 hours replays the first answer.' : 'No Idempotency-Key support: do not repeat blindly.',
-      live_confirmation: isWrite(op) && ctx.config.mode === 'live' ? 'The first call returns a plan; repeat with confirm=true.' : undefined,
+      live_confirmation: isWrite(op) && ctx.config.mode === 'live' ? 'The first call returns a plan and a one-time confirmation_token; repeat the call with that token after the user approved. confirm=true alone does nothing on the LIVE Hub.' : undefined,
     },
-    how_to_call: exampleCall(op),
+    how_to_call: exampleCall(ctx, op),
   };
 }
 
@@ -142,7 +144,7 @@ export function buildCompactTools(ctx: AppContext): ToolDefinition[] {
       `${badge} Call any Hub API v2 operation by id. Validates against the spec before sending; adds an Idempotency-Key to writes; follows pagination with all_pages (capped). ` +
       (writes
         ? config.mode === 'live'
-          ? 'Writes are ENABLED against the LIVE Hub: the first write call returns a plan and sends nothing; repeat with confirm=true only after the user approves.'
+          ? 'Writes are ENABLED against the LIVE Hub: the first write call returns a plan and a one-time confirmation_token and sends nothing; repeat the same call with confirmation_token only after the user approves (confirm=true does nothing on the live Hub).'
           : 'Writes are enabled in this SANDBOX (synthetic data).'
         : 'The server is READ-ONLY: only GET operations run; writes are refused.') +
       ' Put path parameters in path_params, filters in query, JSON in body. Use `fields` (dotted paths such as ["candidate_ref","name"]) to keep answers small. Credits are units; money is integer pence with a currency. Never ask the user for an API key in chat.',
@@ -154,7 +156,8 @@ export function buildCompactTools(ctx: AppContext): ToolDefinition[] {
         query: { type: 'object', description: 'Query parameters, e.g. {"per_page":50,"search":"jane"}.' },
         body: { description: 'JSON request body (object). For file uploads use {"filename","content_base64","content_type"} for file fields.' },
         headers: { type: 'object', description: 'Only headers the operation declares (e.g. Idempotency-Key). Authorization is never settable.' },
-        confirm: { type: 'boolean', description: 'Live writes only: true after the user approved the plan.' },
+        confirm: { type: 'boolean', description: 'Sandbox writes only: true to confirm. On the LIVE Hub this does nothing: use confirmation_token.' },
+        confirmation_token: { type: 'string', description: 'LIVE writes: the one-time token from the plan the first call returned. Send it, with the same arguments, only after the user approved that plan. It works once, for those exact arguments, for ten minutes.' },
         all_pages: { type: 'boolean', description: 'List operations: fetch following pages and merge data.' },
         max_pages: { type: 'integer', description: 'With all_pages: pages to fetch (default 5, max 20).' },
         fields: { type: 'array', items: { type: 'string' }, description: 'Keep only these dotted paths of each record in `data`.' },
@@ -170,7 +173,7 @@ export function buildCompactTools(ctx: AppContext): ToolDefinition[] {
       const a = callArgs.safeParse(raw);
       if (!a.success) return textResult(`Invalid arguments: ${a.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`, true);
       const { operation_id, ...rest } = a.data;
-      return ctx.executor.call(operation_id, rest);
+      return ctx.executor.call(operation_id, { ...rest, confirmed: undefined });
     },
   };
 

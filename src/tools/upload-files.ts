@@ -27,6 +27,10 @@ export interface SafeFile {
 
 export type ReadOutcome = { ok: true; file: SafeFile } | { ok: false; problem: string };
 
+/** The refusal while HB_UPLOAD_DIRS is not set: there is no default folder, so nothing can be read from disk. */
+export const UPLOAD_NOT_SET_UP =
+  'certificate upload is not set up: the owner must list the folder(s) certificates may be read from in HB_UPLOAD_DIRS (a comma-separated list of absolute paths, for example /Users/me/certificates; in the Claude plugin use /plugin configure hb-hub@healthier-business, "Certificate folders"), then restart the server. There is no default folder. Never try another path to get around this.';
+
 const WILDCARD = /[*?[\]{}]/;
 
 function inside(root: string, target: string): boolean {
@@ -57,6 +61,7 @@ function magicMatches(extension: string, head: Buffer): boolean {
  */
 export async function readUploadFile(path: string, allowedDirs: string[], limits: UploadLimits): Promise<ReadOutcome> {
   const no = (problem: string): ReadOutcome => ({ ok: false, problem });
+  if (allowedDirs.length === 0) return no(UPLOAD_NOT_SET_UP);
   if (path.includes('\0')) return no('the path is not valid.');
   if (!isAbsolute(path)) return no('certificate_path must be an absolute path to one file.');
   if (WILDCARD.test(path)) return no('certificate_path must name exactly one file: wildcards and patterns ( * ? [ ] { } ) are not expanded.');

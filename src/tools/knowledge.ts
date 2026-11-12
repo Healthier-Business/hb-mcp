@@ -106,7 +106,7 @@ export function statusTool(ctx: AppContext): ToolDefinition {
           ? 'Read-only: every non-GET operation is refused. The owner enables writes with HB_READ_ONLY=false.'
           : c.mode === 'live'
             ? c.allowLiveWrites
-              ? 'Live writes allowed; each needs confirm=true after the plan is shown.'
+              ? 'Live writes allowed; each first returns a plan and a one-time confirmation_token, and runs only when the call is repeated with that token.'
               : 'HB_READ_ONLY=false but live writes are not allowed (HB_ALLOW_LIVE_WRITES is not true).'
             : 'Sandbox writes allowed (synthetic data).',
         toolsets: c.toolsets,

@@ -319,9 +319,17 @@ describe('every write task tool', () => {
     const plan = await h.call('hb_save_candidate', MIN.hb_save_candidate!.args);
     expect(plan.parts[0]).toContain('LIVE Hub');
     expect(writes(h)).toHaveLength(0);
-    const done = await h.call('hb_save_candidate', { ...MIN.hb_save_candidate!.args, confirm: true });
+    const bare = await h.call('hb_save_candidate', { ...MIN.hb_save_candidate!.args, confirm: true });
+    expect(bare.data.stage).toBe('plan');
+    expect(bare.data.confirmation_token).toMatch(/^hbc_/);
+    expect(writes(h)).toHaveLength(0);
+    const done = await h.call('hb_save_candidate', { ...MIN.hb_save_candidate!.args, confirmation_token: bare.data.confirmation_token });
     expect(done.isError).toBe(false);
     expect(writes(h).map((q) => q.opId)).toEqual(['hub.candidates.create']);
+    const replay = await h.call('hb_save_candidate', { ...MIN.hb_save_candidate!.args, confirmation_token: bare.data.confirmation_token });
+    expect(replay.data.stage).toBe('plan');
+    expect(replay.parts[0]).toContain('not recognised');
+    expect(writes(h)).toHaveLength(1);
   });
 });
 
@@ -562,7 +570,8 @@ describe('hb_request_references', () => {
     expect(dup.data.problems.join(' ')).toContain('same email');
     const cp = await h.call('hb_request_references', { candidate_ref: REF, collection_mode: 'candidate_provides' });
     expect(cp.parts[0]).toContain('a real person on the LIVE Hub');
-    const add = await h.call('hb_request_references', { request_uuid: '7c9e6679-7425-40de-944b-e07fc1f90ae7', referees: [referee], confirm: true });
+    const addPlan = await h.call('hb_request_references', { request_uuid: '7c9e6679-7425-40de-944b-e07fc1f90ae7', referees: [referee] });
+    const add = await h.call('hb_request_references', { request_uuid: '7c9e6679-7425-40de-944b-e07fc1f90ae7', referees: [referee], confirmation_token: addPlan.data.confirmation_token });
     expect(add.isError).toBe(false);
     expect(writes(h).map((q) => q.opId)).toEqual(['references.requests.referees.create']);
   });
@@ -785,23 +794,27 @@ describe('hb_redeliver_webhooks', () => {
 
 describe('hb_rotate_webhook_secret', () => {
   it('plan warns receivers will fail; confirm rotates, saves the secret to a new file and never shows it', async () => {
-    h = await startHarness(WRITE_ENV);
     const dir = mkdtempSync(join(tmpdir(), 'hb-rot-'));
+    h = await startHarness({ ...WRITE_ENV, HB_SECRETS_DIR: dir });
     const file = join(dir, 'new-secret.txt');
-    const plan = await h.call('hb_rotate_webhook_secret', { endpoint_id: 12, save_secret_to: file });
+    const plan = await h.call('hb_rotate_webhook_secret', { endpoint_id: 12, save_secret_to: 'new-secret.txt' });
     expect(plan.parts[0]).toContain('will reject deliveries until you give it the new secret');
     expect(plan.parts[0]).toContain('80 minutes');
     expect(plan.parts[0]).toContain(`saved to ${file}`);
     expect(writes(h)).toHaveLength(0);
     expect(existsSync(file)).toBe(false);
-    const done = await h.call('hb_rotate_webhook_secret', { endpoint_id: 12, save_secret_to: file, confirm: true });
+    const done = await h.call('hb_rotate_webhook_secret', { endpoint_id: 12, save_secret_to: 'new-secret.txt', confirm: true });
     expect(done.isError).toBe(false);
     expect(done.text).not.toContain(EXAMPLE_SECRET);
     expect(done.data.signing_secret).toBe('withheld');
     expect(readFileSync(file, 'utf8').trim()).toBe(EXAMPLE_SECRET);
     expect(writes(h).map((q) => q.opId)).toEqual(['webhooks.endpoints.rotate-secret']);
-    const again = await h.call('hb_rotate_webhook_secret', { endpoint_id: 12, save_secret_to: file });
+    const again = await h.call('hb_rotate_webhook_secret', { endpoint_id: 12, save_secret_to: 'new-secret.txt' });
     expect(again.data.problems.join(' ')).toContain('already exists');
+    const outside = await h.call('hb_rotate_webhook_secret', { endpoint_id: 12, save_secret_to: join(tmpdir(), 'elsewhere-secret.txt') });
+    expect(outside.data.problems.join(' ')).toContain('directly inside the secrets folder');
+    const traversal = await h.call('hb_rotate_webhook_secret', { endpoint_id: 12, save_secret_to: '../escape.txt' });
+    expect(traversal.data.problems.join(' ')).toContain('plain file name');
   });
 
   it('without save_secret_to the secret is withheld and lost, with a warning; live plan warns about production', async () => {
@@ -810,7 +823,8 @@ describe('hb_rotate_webhook_secret', () => {
     expect(plan.parts[0]).toContain('LIVE Hub: real events to your production receiver will fail');
     expect(plan.parts[0]).toContain('no save_secret_to');
     expect(writes(h)).toHaveLength(0);
-    const done = await h.call('hb_rotate_webhook_secret', { endpoint_id: 12, confirm: true });
+    expect(plan.data.confirmation_token).toMatch(/^hbc_/);
+    const done = await h.call('hb_rotate_webhook_secret', { endpoint_id: 12, confirmation_token: plan.data.confirmation_token });
     expect(done.isError).toBe(false);
     expect(done.text).not.toContain(EXAMPLE_SECRET);
     expect(done.parts[0]).toContain('withheld');

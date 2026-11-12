@@ -1,14 +1,15 @@
 import { isApprovalCode } from '../approval.js';
 import type { CatalogueOperation } from '../catalogue.js';
-import { writesEnabled } from '../config.js';
+import { writesEnabled, type Config } from '../config.js';
 import { scopeAllowed, type AppContext } from '../context.js';
 import type { CallArgs } from '../execute.js';
+import { fenceUntrusted, TASK_TEXT_NOTICE, unfenceUntrusted } from '../output.js';
 import { redactor } from '../redact.js';
 import { gate, isWrite } from '../safety.js';
 import { SafetyRefusal } from '../errors.js';
-import { open } from 'node:fs/promises';
+import { mkdir, open } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { dirname, isAbsolute } from 'node:path';
+import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { textResult, type ToolDefinition, type ToolResult } from './types.js';
 
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -115,7 +116,7 @@ function parseOutcome(op: string, res: ToolResult): CallOutcome {
     return { op, ok: false, status: m ? Number(m[1]) : undefined, code: m?.[2], error: text };
   }
   try {
-    const parsed = JSON.parse(text) as Json;
+    const parsed = JSON.parse(unfenceUntrusted(text)) as Json;
     if (parsed?.status === 'confirmation_required') {
       return { op, ok: false, error: 'The call returned a confirmation plan instead of running.' };
     }
@@ -161,7 +162,7 @@ export function taskResult(ctx: AppContext, run: TaskRun, report: TaskReport, is
   let json = redactor.redact(JSON.stringify(data, null, 1));
   if (text.length > max / 2) text = text.slice(0, max / 2) + '\n…[truncated]';
   if (json.length > max / 2) json = JSON.stringify({ environment: data.environment, operations_called: data.operations_called, note: 'Structured data omitted: too large. The text above is complete up to its limit.' });
-  const result = { content: [{ type: 'text' as const, text }, { type: 'text' as const, text: json }] } as ToolResult;
+  const result = { content: [{ type: 'text' as const, text: `${TASK_TEXT_NOTICE}\n${text}` }, { type: 'text' as const, text: fenceUntrusted(json) }] } as ToolResult;
   if (isError) result.isError = true;
   return result;
 }
@@ -246,20 +247,46 @@ export function protect(...values: unknown[]): void {
   for (const v of values) if (typeof v === 'string') redactor.add(v);
 }
 
-/** Write a one-time secret to a NEW owner-only file. Returns a problem text, or undefined when saved. */
-export async function saveSecretFile(path: string, secret: string): Promise<string | undefined> {
-  if (!isAbsolute(path)) return 'save_secret_to must be an absolute path.';
-  if (!existsSync(dirname(path))) return 'The folder for save_secret_to does not exist.';
+/**
+ * Where a secret file may go: only a direct child of the configured secrets folder (HB_SECRETS_DIR, by default
+ * `~/.config/hb-hub-mcp/secrets`). The request is either a bare file name (kept in that folder) or an absolute path inside it.
+ * Returns the full path to write, or a problem text. Nothing is created here.
+ */
+export function checkSecretTarget(config: Pick<Config, 'secretsDir'>, requested: string): { path: string } | { problem: string } {
+  const dir = config.secretsDir;
+  const where = `the secrets folder ${dir} (set HB_SECRETS_DIR to change it)`;
+  const value = requested.trim();
+  if (value === '' || value.includes('\0')) return { problem: 'save_secret_to is not a valid file name.' };
+  let path: string;
+  if (isAbsolute(value)) {
+    path = resolve(value);
+  } else if (/[\\/]/.test(value) || value === '.' || value === '..') {
+    return { problem: `save_secret_to must be a plain file name or an absolute path inside ${where}.` };
+  } else {
+    path = join(dir, value);
+  }
+  if (dirname(path) !== resolve(dir) || basename(path) === '' || basename(path) === '..') {
+    return { problem: `save_secret_to must be a new file directly inside ${where}. Use a file name such as "webhook-secret.txt".` };
+  }
+  if (existsSync(path)) return { problem: 'save_secret_to already exists; the server never overwrites files.' };
+  return { path };
+}
+
+/** Write a one-time secret to a NEW owner-only file inside the secrets folder (created owner-only if missing). */
+export async function saveSecretFile(config: Pick<Config, 'secretsDir'>, requested: string, secret: string): Promise<{ saved: true; path: string } | { saved: false; problem: string }> {
+  const target = checkSecretTarget(config, requested);
+  if ('problem' in target) return { saved: false, problem: target.problem };
   try {
-    const f = await open(path, 'wx', 0o600);
+    await mkdir(config.secretsDir, { recursive: true, mode: 0o700 });
+    const f = await open(target.path, 'wx', 0o600);
     try {
       await f.writeFile(secret + '\n');
     } finally {
       await f.close();
     }
-    return undefined;
+    return { saved: true, path: target.path };
   } catch (e) {
-    return (e as NodeJS.ErrnoException).code === 'EEXIST' ? 'save_secret_to already exists; the server never overwrites files.' : 'The secret file could not be written.';
+    return { saved: false, problem: (e as NodeJS.ErrnoException).code === 'EEXIST' ? 'save_secret_to already exists; the server never overwrites files.' : 'The secret file could not be written.' };
   }
 }
 

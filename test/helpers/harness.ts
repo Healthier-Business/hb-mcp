@@ -3,6 +3,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { loadConfig, type Config } from '../../src/config.js';
 import type { AppContext } from '../../src/context.js';
 import { createContext, createMcpServer } from '../../src/server.js';
+import { unfenceUntrusted } from '../../src/output.js';
 import { redactor } from '../../src/redact.js';
 import { setLogLevel, setLogSink } from '../../src/log.js';
 import { MOCK_KEY, MockHub } from './mock-hub.js';
@@ -39,9 +40,9 @@ export async function startHarness(env: Record<string, string> = {}, hub?: MockH
       const parts = (r.content as { type: string; text: string }[]).map((c) => c.text);
       const text = parts.join('\n');
       let json: any;
-      try { json = JSON.parse(text); } catch { json = undefined; }
+      try { json = JSON.parse(unfenceUntrusted(text)); } catch { json = undefined; }
       let data: any;
-      try { data = parts.length > 1 ? JSON.parse(parts[parts.length - 1] as string) : undefined; } catch { data = undefined; }
+      try { data = parts.length > 1 ? JSON.parse(unfenceUntrusted(parts[parts.length - 1] as string)) : undefined; } catch { data = undefined; }
       return { text, isError: r.isError === true, json, parts, data };
     },
     async close() {

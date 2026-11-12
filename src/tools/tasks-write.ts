@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { scopeAllowed, type AppContext } from '../context.js';
+import { decide, howToConfirm } from '../confirmation.js';
 import { SafetyRefusal } from '../errors.js';
 import { redactor } from '../redact.js';
 import {
@@ -41,6 +42,7 @@ const bookArgs = z.object({
   agency_contact_email: z.string().email().max(255).optional(),
   agency_email: z.string().email().max(255).optional(),
   confirm: z.boolean().optional(),
+  confirmation_token: z.string().max(200).optional(),
   idempotency_key: z.string().max(200).optional(),
 });
 
@@ -60,8 +62,8 @@ export function bookPracticalTrainingTool(ctx: AppContext): TaskTool {
     definition: {
       name: 'hb_book_practical_training',
       description:
-        `${live ? '[LIVE Hub]' : '[SANDBOX]'} Guided practical training booking in two calls. CALL 1 (no confirm): give candidate_ref and, optionally, course_id, location_id or location (name), date_from/date_to; it finds sessions with free places, checks the candidate and the credits, and returns the options and the exact plan. Nothing is sent. CALL 2: repeat with event_id (the chosen session), pay_option, agency_contact_name, agency_contact_email and confirm=true after the user approved: it holds the place, books it and reports the booking. ` +
-        'Set invite=true instead to email the candidate an invitation to choose their own session (nothing is charged until they book). Uses an Idempotency-Key (reuse the one returned to retry safely). Writes: confirm=true is required in every environment, and on LIVE the server must also allow live writes. Uses practical-training.events.list, .credits.show, .events.hold, .bookings.create, .booking-invites.create and hub.candidates.show. Credits are units; money is shown as an amount.',
+        `${live ? '[LIVE Hub]' : '[SANDBOX]'} Guided practical training booking in two calls. CALL 1 (no confirmation): give candidate_ref and, optionally, course_id, location_id or location (name), date_from/date_to; it finds sessions with free places, checks the candidate and the credits, and returns the options and the exact plan. Nothing is sent. CALL 2: repeat with event_id (the chosen session), pay_option, agency_contact_name, agency_contact_email and the confirmation_token (a sandbox also accepts confirm=true) after the user approved: it holds the place, books it and reports the booking. ` +
+        'Set invite=true instead to email the candidate an invitation to choose their own session (nothing is charged until they book). Uses an Idempotency-Key (reuse the one returned to retry safely). Writes: a confirmation is required in every environment (a sandbox accepts confirm=true; the LIVE Hub needs the one-time confirmation_token), and on LIVE the server must also allow live writes. Uses practical-training.events.list, .credits.show, .events.hold, .bookings.create, .booking-invites.create and hub.candidates.show. Credits are units; money is shown as an amount.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -77,7 +79,8 @@ export function bookPracticalTrainingTool(ctx: AppContext): TaskTool {
           agency_contact_name: { type: 'string', description: 'Person at the account responsible for the booking (invite: optional contact copied in).' },
           agency_contact_email: { type: 'string', description: 'Their email address.' },
           agency_email: { type: 'string', description: 'Address for the agency confirmation email. Optional.' },
-          confirm: { type: 'boolean', description: 'true only after the user approved the plan from call 1. Without it nothing is sent.' },
+          confirm: { type: 'boolean', description: 'Sandbox only: true after the user approved the plan from call 1. On the LIVE Hub this does nothing: use confirmation_token.' },
+          confirmation_token: { type: 'string', description: 'LIVE Hub: the one-time token from the plan of call 1. Send it, with the same arguments, only after the user approved that plan. It works once, for those exact arguments, for ten minutes.' },
           idempotency_key: { type: 'string', description: 'Reuse the key returned by an earlier call to repeat the booking safely.' },
         },
         required: ['candidate_ref'],
@@ -112,22 +115,24 @@ export function bookPracticalTrainingTool(ctx: AppContext): TaskTool {
         if (!c.email) missing.push('email address');
         if (!args.invite && !c.phone) missing.push('phone number');
         const environmentLine = live ? 'LIVE Hub: real people, real credits and real emails.' : 'SANDBOX: synthetic data.';
-        const key = args.idempotency_key ?? randomUUID();
+        const key = args.idempotency_key ?? ctx.confirmations.peekIdempotencyKey(args.confirmation_token) ?? randomUUID();
 
         // ---------- invitation
         if (args.invite) {
           const body: Json = { candidate_ref: ref, ...(args.agency_contact_name ? { contact_name: args.agency_contact_name } : {}), ...(args.agency_contact_email ? { contact_email: args.agency_contact_email } : {}) };
-          if (args.confirm !== true) {
+          const inviteDecision = decide(ctx.confirmations, { live, tool: 'hb_book_practical_training', args, idempotencyKey: key, issueToken: missing.length === 0 });
+          if (!inviteDecision.confirmed) {
             const lines = [
               environmentLine,
               `PLAN (nothing sent): invite ${c.name ?? ref} (${c.email ?? 'no email'}) to book a practical training place. They get an email with a one-time link valid for 8 weeks and choose the session. Nothing is charged by the invitation; the place is paid when they book (the call only checks the account can pay).`,
               ...(missing.length ? [`Cannot proceed yet: the candidate has no ${missing.join(', ')}. Add it with hub.candidates.update first.`] : []),
-              'To send it, call again with the same arguments, confirm=true' + (args.agency_contact_email ? '' : ' (agency_contact_name and agency_contact_email are optional: the person copied in)') + `, idempotency_key "${key}", after the user agrees.`,
+              ...(inviteDecision.rejected ? [`${inviteDecision.rejected} A new plan was made.`] : []),
+              howToConfirm(live, inviteDecision.token, key, inviteDecision.expiresInSeconds) + (args.agency_contact_email ? '' : ' (agency_contact_name and agency_contact_email are optional: the person copied in)'),
             ];
-            return taskResult(ctx, run, { lines, data: { executed: false, stage: 'plan', mode: 'invite', candidate: { candidate_ref: ref, name: c.name }, missing_details: missing, idempotency_key: key, request_body: body } });
+            return taskResult(ctx, run, { lines, data: { executed: false, stage: 'plan', mode: 'invite', ...(inviteDecision.token ? { confirmation_token: inviteDecision.token, confirmation_expires_in_seconds: inviteDecision.expiresInSeconds } : {}), candidate: { candidate_ref: ref, name: c.name }, missing_details: missing, idempotency_key: key, request_body: body } });
           }
           if (missing.length) return refusal(`The candidate has no ${missing.join(', ')}, so the invitation cannot be sent. Nothing was sent.`);
-          const r = await run.call('practical-training.booking-invites.create', { body, confirm: true, idempotency_key: key }, { noPrecheck: true });
+          const r = await run.call('practical-training.booking-invites.create', { body, confirmed: true, idempotency_key: key }, { noPrecheck: true });
           if (!r.ok) return fail(ctx, run, 'The invitation was not sent', r, key);
           const d = r.data ?? {};
           const lines = [environmentLine, `Invitation sent to ${c.name ?? ref}: invite #${d.id ?? '?'} (${d.status ?? 'waiting'}), valid until ${day(d.expires_at)}. The candidate chooses the session and pays when they book.`, `Idempotency key: ${key}.`, `Operations called: ${run.operationsCalled().join(', ')}.`];
@@ -192,16 +197,18 @@ export function bookPracticalTrainingTool(ctx: AppContext): TaskTool {
           const have = creditsFor(sess.course?.id);
           const cost = args.pay_option ? `Pay option ${args.pay_option}: ${PAY_EXPLAINED[args.pay_option]}.` : 'Choose a pay option.';
           const balanceLine = creditData ? ` Booking credits for this course: ${have}; booking balance ${money(creditData.booking_balance_pence, creditData.currency)}.` : ' Credits could not be checked.';
-          if (args.confirm !== true) {
+          const bookDecision = decide(ctx.confirmations, { live, tool: 'hb_book_practical_training', args, idempotencyKey: key, issueToken: missing.length === 0 && need.length === 0 && Number(sess.remaining_slots) > 0 });
+          if (!bookDecision.confirmed) {
             const lines = [
               environmentLine,
               `PLAN (nothing sent): book ${c.name ?? ref} on ${sess.course?.name ?? 'course'} at ${sess.location?.name ?? '-'}, ${when(sess.start_date)} to ${when(sess.end_date)}, ${sess.remaining_slots ?? '?'} place(s) left, price ${price}. ${cost}${balanceLine}`,
               ...(missing.length ? [`Cannot proceed yet: the candidate has no ${missing.join(', ')}. Add it with hub.candidates.update first.`] : []),
               ...(need.length ? [`Still needed: ${need.join(', ')}.`] : []),
               `Steps on confirm: hold the place (${'practical-training.events.hold'}, takes no seat and no credit), then book it (${'practical-training.bookings.create'}).`,
-              `To book, call again with the same arguments plus confirm=true and idempotency_key "${key}", after the user agrees.`,
+              ...(bookDecision.rejected ? [`${bookDecision.rejected} A new plan was made.`] : []),
+              howToConfirm(live, bookDecision.token, key, bookDecision.expiresInSeconds),
             ];
-            return taskResult(ctx, run, { lines, data: { executed: false, stage: 'plan', candidate: { candidate_ref: ref, name: c.name }, session: { event_id: sess.id, course: sess.course?.name, location: sess.location?.name, start_date: sess.start_date, remaining_slots: sess.remaining_slots, price }, pay_option: args.pay_option, missing_details: missing, still_needed: need, idempotency_key: key, request_body: body } });
+            return taskResult(ctx, run, { lines, data: { executed: false, stage: 'plan', ...(bookDecision.token ? { confirmation_token: bookDecision.token, confirmation_expires_in_seconds: bookDecision.expiresInSeconds } : {}), candidate: { candidate_ref: ref, name: c.name }, session: { event_id: sess.id, course: sess.course?.name, location: sess.location?.name, start_date: sess.start_date, remaining_slots: sess.remaining_slots, price }, pay_option: args.pay_option, missing_details: missing, still_needed: need, idempotency_key: key, request_body: body } });
           }
 
           // ---------- confirmed: hold, then book
@@ -209,7 +216,7 @@ export function bookPracticalTrainingTool(ctx: AppContext): TaskTool {
           if (missing.length) return refusal(`The candidate has no ${missing.join(', ')}; the Hub would reject the booking. Add it with hub.candidates.update. Nothing was sent.`);
           if (Number(sess.remaining_slots) <= 0) return refusal('That session has no free places left. Run the first call again to see other options. Nothing was sent.');
 
-          const hold = await run.call('practical-training.events.hold', { path_params: { event: args.event_id }, confirm: true, idempotency_key: `${key}-hold` }, { noPrecheck: true });
+          const hold = await run.call('practical-training.events.hold', { path_params: { event: args.event_id }, confirmed: true, idempotency_key: `${key}-hold` }, { noPrecheck: true });
           if (!hold.ok) {
             const extra = hold.status === 409 ? ' The account may hold only one place at a time and already has a live hold (30 minutes). Wait for it to expire, or release it with hb_call_operation practical-training.events.release.' : '';
             return fail(ctx, run, `The place could not be held, nothing was booked.${extra}`, hold, key);
@@ -217,7 +224,7 @@ export function bookPracticalTrainingTool(ctx: AppContext): TaskTool {
           const hash: string | undefined = hold.data?.hold_hash;
           if (!hash) return fail(ctx, run, 'The hold answer had no hold_hash, nothing was booked', hold, key);
           redactor.add(hash);
-          const book = await run.call('practical-training.bookings.create', { body: { hold_hash: hash, ...body }, confirm: true, idempotency_key: `${key}-book` }, { noPrecheck: true });
+          const book = await run.call('practical-training.bookings.create', { body: { hold_hash: hash, ...body }, confirmed: true, idempotency_key: `${key}-book` }, { noPrecheck: true });
           if (!book.ok) {
             const unknownOutcome = book.status === undefined && /No answer from the Hub/.test(book.error ?? '') || (book.status ?? 0) >= 500;
             let released = false;
@@ -286,14 +293,14 @@ export function setupSandboxWebhookTool(ctx: AppContext): TaskTool {
     definition: {
       name: 'hb_setup_sandbox_webhook',
       description:
-        '[SANDBOX ONLY] Create a webhook endpoint for an https URL with chosen events (default: a sensible set), send a test event and report the delivery result. Refuses on the LIVE Hub. The signing secret is shown only once by the Hub: this tool NEVER returns it in the answer (it is withheld and scrubbed). To keep it, pass `save_secret_to` (an absolute path to a NEW file, written with owner-only permissions on the machine running this server), then put its content in HB_WEBHOOK_SECRET for hb_verify_webhook_signature; otherwise rotate the secret later in the Hub or developer portal. Does not create a second endpoint for a URL that is already registered. Uses webhooks.events.list, webhooks.endpoints.list/.create/.test and webhooks.deliveries.list.',
+        '[SANDBOX ONLY] Create a webhook endpoint for an https URL with chosen events (default: a sensible set), send a test event and report the delivery result. Refuses on the LIVE Hub. The signing secret is shown only once by the Hub: this tool NEVER returns it in the answer (it is withheld and scrubbed). To keep it, pass `save_secret_to` (a new file name; it is written with owner-only permissions into the secrets folder HB_SECRETS_DIR on the machine running this server, default ~/.config/hb-hub-mcp/secrets), then put its content in HB_WEBHOOK_SECRET for hb_verify_webhook_signature; otherwise rotate the secret later in the Hub or developer portal. Does not create a second endpoint for a URL that is already registered. Uses webhooks.events.list, webhooks.endpoints.list/.create/.test and webhooks.deliveries.list.',
       inputSchema: {
         type: 'object',
         properties: {
           url: { type: 'string', description: 'Public https URL that receives events (no credentials in it).' },
           name: { type: 'string', description: 'Endpoint name (default "MCP sandbox webhook").' },
           events: { type: 'array', items: { type: 'string' }, description: 'Event names from hb_list_events. Default: course completed, training expiring, booking created and confirmed, OH request submitted and full clearance, plus the seven training-verification events when the key has a training-verification scope.' },
-          save_secret_to: { type: 'string', description: 'Absolute path of a new file to write the signing secret to (owner-only). Optional.' },
+          save_secret_to: { type: 'string', description: 'A new file name (for example "webhook-secret.txt"); written owner-only into the secrets folder (HB_SECRETS_DIR). Optional.' },
         },
         required: ['url'],
         additionalProperties: false,
@@ -342,7 +349,7 @@ export function setupSandboxWebhookTool(ctx: AppContext): TaskTool {
         let secret: string | undefined;
         const created = await run.call('webhooks.endpoints.create', {
           body: { name: a.data.name ?? 'MCP sandbox webhook', url: a.data.url, events: wanted, is_active: true, timeout_seconds: 10 },
-          confirm: true,
+          confirmed: true,
           onResponse: (json) => {
             const s = (json as Json)?.signing_secret;
             if (typeof s === 'string') {
@@ -360,16 +367,17 @@ export function setupSandboxWebhookTool(ctx: AppContext): TaskTool {
         let secretLine: string;
         let secretSaved = false;
         if (secret && a.data.save_secret_to) {
-          const problem = await saveSecretFile(a.data.save_secret_to, secret);
-          secretSaved = problem === undefined;
-          secretLine = secretSaved
-            ? `The signing secret was saved to ${a.data.save_secret_to} (owner-only). It is not shown here. Put its content in HB_WEBHOOK_SECRET on the receiver and for hb_verify_webhook_signature.`
+          const saveResult = await saveSecretFile(ctx.config, a.data.save_secret_to, secret);
+          secretSaved = saveResult.saved;
+          const problem = saveResult.saved ? undefined : saveResult.problem;
+          secretLine = saveResult.saved
+            ? `The signing secret was saved to ${saveResult.path} (owner-only). It is not shown here. Put its content in HB_WEBHOOK_SECRET on the receiver and for hb_verify_webhook_signature.`
             : `The signing secret could NOT be saved (${problem}) and was withheld from this answer. Rotate it to get a new one (webhooks.endpoints.rotate-secret) and save it with a valid path.`;
         } else {
           secretLine = 'The signing secret was created and is withheld from this answer (the Hub shows it only once). You did not ask for it to be saved, so rotate it to get a new one when you need it: webhooks.endpoints.rotate-secret, or the Hub Developer page or developer portal. Never paste it in chat.';
         }
 
-        const test = await run.call('webhooks.endpoints.test', { path_params: { webhook: ep.id }, confirm: true }, { noPrecheck: true });
+        const test = await run.call('webhooks.endpoints.test', { path_params: { webhook: ep.id }, confirmed: true }, { noPrecheck: true });
         let deliveryLine: string;
         let delivery: Json | undefined;
         if (!test.ok) {

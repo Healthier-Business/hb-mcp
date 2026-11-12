@@ -1,7 +1,7 @@
 {
   "name": "hb-hub",
   "displayName": "Healthier Business Hub",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Use the Healthier Business Hub API v2 from Claude Code: read-only by default, sandbox first, live writes need a plan and an explicit yes.",
   "author": { "name": "Healthier Business" },
   "homepage": "https://github.com/Healthier-Business/hb-mcp#readme",
@@ -20,8 +20,20 @@
     "base_url": {
       "type": "string",
       "title": "Hub base URL",
-      "description": "The base URL of your sandbox, shown on its page in the developer portal. Use the live Hub address only when you are ready to work with real data.",
+      "description": "The base URL of your sandbox, shown on its page in the developer portal. Use the live Hub address only when you are ready to work with real data. The API key is sent to this address, so it should be a hbcompliance.co.uk address (the server warns on stderr for any other host).",
       "required": true
+    },
+    "upload_dirs": {
+      "type": "string",
+      "title": "Certificate folders",
+      "description": "Optional. Folders the Hub tool may read training certificates from, as a comma-separated list of absolute paths, for example /Users/you/certificates. There is no default: leave it empty and certificate upload stays switched off (every file is refused). Hidden files and links that leave these folders are never read.",
+      "required": false
+    },
+    "secrets_dir": {
+      "type": "string",
+      "title": "Webhook secret folder",
+      "description": "Optional. The one absolute folder where a new webhook signing secret is saved when Claude is asked to keep one (owner-only files, never overwritten). Leave it empty to use ~/.config/hb-hub-mcp/secrets. A secret can be saved nowhere else.",
+      "required": false
     }
   }
 }

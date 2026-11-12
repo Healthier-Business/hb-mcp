@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, readFileSync, existsSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -431,9 +431,17 @@ describe('hb_book_practical_training', () => {
     const plan = await h.call('hb_book_practical_training', CHOSEN);
     expect(plan.parts[0]).toContain('LIVE Hub');
     expect(writes(h)).toHaveLength(0);
-    const done = await h.call('hb_book_practical_training', { ...CHOSEN, confirm: true });
+    expect(plan.data.confirmation_token).toMatch(/^hbc_/);
+    expect(plan.parts[0]).toContain('confirmation_token');
+    const bare = await h.call('hb_book_practical_training', { ...CHOSEN, confirm: true });
+    expect(bare.data.stage).toBe('plan');
+    expect(writes(h)).toHaveLength(0);
+    const done = await h.call('hb_book_practical_training', { ...CHOSEN, confirmation_token: bare.data.confirmation_token });
     expect(done.isError).toBe(false);
     expect(writes(h).map((q) => q.opId)).toEqual(['practical-training.events.hold', 'practical-training.bookings.create']);
+    const replay = await h.call('hb_book_practical_training', { ...CHOSEN, confirmation_token: bare.data.confirmation_token });
+    expect(replay.data.stage).toBe('plan');
+    expect(writes(h)).toHaveLength(2);
   });
 
   it('invite mode: plan first, then one invitation', async () => {
@@ -499,19 +507,25 @@ describe('hb_setup_sandbox_webhook', () => {
   });
 
   it('save_secret_to keeps the secret in a new owner-only file, never in the answer, and never overwrites', async () => {
-    h = await startHarness(WRITE_ENV);
-    const dir = mkdtempSync(join(tmpdir(), 'hb-secret-'));
+    const dir = join(mkdtempSync(join(tmpdir(), 'hb-secret-')), 'secrets');
+    h = await startHarness({ ...WRITE_ENV, HB_SECRETS_DIR: dir });
     const file = join(dir, 'secret.txt');
-    const r = await h.call('hb_setup_sandbox_webhook', { url: URL_OK, save_secret_to: file });
+    const r = await h.call('hb_setup_sandbox_webhook', { url: URL_OK, save_secret_to: 'secret.txt' });
     expect(r.text).not.toContain(EXAMPLE_SECRET);
     expect(r.parts[0]).toContain(`saved to ${file}`);
     expect(readFileSync(file, 'utf8').trim()).toBe(EXAMPLE_SECRET);
+    expect(statSync(file).mode & 0o777).toBe(0o600);
+    expect(statSync(dir).mode & 0o777).toBe(0o700);
     const again = await h.call('hb_setup_sandbox_webhook', { url: 'https://receiver.example.org/other', save_secret_to: file });
     expect(again.parts[0]).toContain('could NOT be saved');
     expect(readFileSync(file, 'utf8').trim()).toBe(EXAMPLE_SECRET);
     expect(existsSync(file)).toBe(true);
-    const rel = await h.call('hb_setup_sandbox_webhook', { url: 'https://receiver.example.org/third', save_secret_to: 'relative.txt' });
-    expect(rel.parts[0]).toContain('must be an absolute path');
+    const outside = await h.call('hb_setup_sandbox_webhook', { url: 'https://receiver.example.org/third', save_secret_to: join(tmpdir(), 'outside-secret.txt') });
+    expect(outside.parts[0]).toContain('could NOT be saved');
+    expect(outside.parts[0]).toContain('directly inside the secrets folder');
+    expect(existsSync(join(tmpdir(), 'outside-secret.txt'))).toBe(false);
+    const nested = await h.call('hb_setup_sandbox_webhook', { url: 'https://receiver.example.org/fourth', save_secret_to: 'sub/dir.txt' });
+    expect(nested.parts[0]).toContain('plain file name');
   });
 
   it('refuses on LIVE with a clear message and sends nothing', async () => {

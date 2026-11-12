@@ -598,7 +598,7 @@ export function goLiveCheckTool(ctx: AppContext): TaskTool {
         if (c.mode === 'sandbox') add('WARN', 'This server points at a SANDBOX, so this check describes the sandbox key. Going live needs a new live key, HB_BASE_URL set to https://hub.hbcompliance.co.uk (or removed), and new webhook endpoints with their own secrets.');
         if (c.modeSource === 'unrecognised-host') add('WARN', 'The base URL is not a known sandbox, so it is treated as LIVE. If it is a sandbox, set HB_ENV=sandbox.');
         if (c.mode === 'live' && c.readOnly) add('OK', 'The server is read-only (HB_READ_ONLY=true): keep it so until the owner is ready for live writes.');
-        if (c.mode === 'live' && !c.readOnly) add(c.allowLiveWrites ? 'WARN' : 'NOTE', c.allowLiveWrites ? 'Live writes are ENABLED (HB_ALLOW_LIVE_WRITES=true). Every write still needs a plan and confirm=true.' : 'HB_READ_ONLY=false but live writes are not allowed (HB_ALLOW_LIVE_WRITES is not true).');
+        if (c.mode === 'live' && !c.readOnly) add(c.allowLiveWrites ? 'WARN' : 'NOTE', c.allowLiveWrites ? 'Live writes are ENABLED (HB_ALLOW_LIVE_WRITES=true). Every live write still needs a plan and its one-time confirmation_token.' : 'HB_READ_ONLY=false but live writes are not allowed (HB_ALLOW_LIVE_WRITES is not true).');
 
         const scopes = key?.scopes ?? [];
         if (!key) {

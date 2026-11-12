@@ -91,7 +91,10 @@ describe('full mode', () => {
     const plan = await h.call('hub_candidates_update', { candidate_ref: REF, body: { first_name: 'Janet' } });
     expect(plan.json.status).toBe('confirmation_required');
     expect(h.hub.apiRequests()).toHaveLength(0);
-    const done = await h.call('hub_candidates_update', { candidate_ref: REF, body: { first_name: 'Janet' }, confirm: true });
+    const bare = await h.call('hub_candidates_update', { candidate_ref: REF, body: { first_name: 'Janet' }, confirm: true });
+    expect(bare.json.status).toBe('confirmation_required');
+    expect(h.hub.apiRequests()).toHaveLength(0);
+    const done = await h.call('hub_candidates_update', { candidate_ref: REF, body: { first_name: 'Janet' }, confirmation_token: bare.json.confirmation_token });
     expect(done.json.meta.status).toBe(200);
   });
 
