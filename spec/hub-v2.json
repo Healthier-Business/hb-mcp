@@ -25941,7 +25941,7 @@
             "get": {
                 "operationId": "references.referees.show",
                 "summary": "Get a referee's reference",
-                "description": "Returns one referee's reference in full: the referee's details, the status, the answers as the form asks them (once the referee has submitted), the score and its breakdown when your account uses scoring, the reason for declining when the referee declined, and the sent, opened, submitted and reminder times. Fetch it when a `references.reference.submitted` or `references.reference.declined` webhook arrives (the webhook carries the `reference_uuid`, not the answers).\n\nYour key needs `references:referees:read` and your account must use the References portal. A referee that does not exist, or whose request belongs to another account, answers `404 not_found` (never `403`). Read only: no email, no webhook.\n\nThis record holds personal data of a third party and what they wrote about the candidate: the referee's name, email and phone, free-text answers and, if they declined, their reason. Store and display it with the same care as a written reference. The referee's private link to the form is never returned by the API (it works as a credential), so there is no `form_url`; to prompt a referee use `POST /referees/{uuid}/reminder`, which emails them their link. The answers omit the referee's own contact details, which are in `referee`. `score` and `score_breakdown` are empty (`null` and `[]`) when the account does not use scoring.",
+                "description": "Returns one referee's reference in full: the referee's details, the status, the answers as the form asks them (once the referee has submitted), the reason for declining when the referee declined, and the sent, opened, submitted and reminder times. Fetch it when a `references.reference.submitted` or `references.reference.declined` webhook arrives (the webhook carries the `reference_uuid`, not the answers).\n\nYour key needs `references:referees:read` and your account must use the References portal. A referee that does not exist, or whose request belongs to another account, answers `404 not_found` (never `403`). Read only: no email, no webhook.\n\nThis record holds personal data of a third party and what they wrote about the candidate: the referee's name, email and phone, free-text answers and, if they declined, their reason. Store and display it with the same care as a written reference. The referee's private link to the form is never returned by the API (it works as a credential), so there is no `form_url`; to prompt a referee use `POST /referees/{uuid}/reminder`, which emails them their link. The answers omit the referee's own contact details, which are in `referee`.",
                 "tags": [
                     "References"
                 ],
@@ -26011,16 +26011,6 @@
                                         "status": "completed",
                                         "status_label": "Completed",
                                         "display_status": "received",
-                                        "score": 4.25,
-                                        "score_breakdown": [
-                                            {
-                                                "label": "Reliability",
-                                                "value": "Excellent",
-                                                "raw_score": 5,
-                                                "weight": 1,
-                                                "weighted_score": 5
-                                            }
-                                        ],
                                         "decline_reason": "decline_reason",
                                         "answers": [
                                             {
@@ -26088,7 +26078,7 @@
             "get": {
                 "operationId": "references.referees.pdf",
                 "summary": "Download a reference as a PDF",
-                "description": "Streams the PDF report of a completed reference: the candidate, the referee, the answers and, when the account uses scoring, the score. Use it to keep a copy of the reference in your own records. If the stored file is missing (for example for an older imported reference) it is built from the stored answers for this response only and is not saved, so the call changes nothing; the answer is the same file layout either way. The file is sent as an attachment named `reference-{referee-name}-{uuid}.pdf`.\n\nYour key needs `references:referees:read` and your account must use the References portal. Only a `completed` reference has a PDF: for any other status, or a completed reference with no stored answers, the answer is `404 pdf_not_available`. An unknown referee, or one of another account, answers `404 not_found`. Check `has_pdf` on `GET /referees/{uuid}` first if you want to avoid the error. The PDF contains personal data of the candidate and the referee: store it securely.",
+                "description": "Streams the PDF report of a completed reference: the candidate, the referee, the answers. Use it to keep a copy of the reference in your own records. If the stored file is missing (for example for an older imported reference) it is built from the stored answers for this response only and is not saved, so the call changes nothing; the answer is the same file layout either way. The file is sent as an attachment named `reference-{referee-name}-{uuid}.pdf`.\n\nYour key needs `references:referees:read` and your account must use the References portal. Only a `completed` reference has a PDF: for any other status, or a completed reference with no stored answers, the answer is `404 pdf_not_available`. An unknown referee, or one of another account, answers `404 not_found`. Check `has_pdf` on `GET /referees/{uuid}` first if you want to avoid the error. The PDF contains personal data of the candidate and the referee: store it securely.",
                 "tags": [
                     "References"
                 ],
@@ -40666,7 +40656,6 @@
                                     "reference_uuid": "3f2504e0-4f89-41d3-9a0c-0305e82c3301",
                                     "reference_request_uuid": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
                                     "candidate_ref": "9f1c2d3e-4b5a-4c6d-8e7f-0a1b2c3d4e5f",
-                                    "score": "4.25",
                                     "submitted_at": "2026-10-30T14:02:11Z"
                                 }
                             }
@@ -54091,56 +54080,6 @@
                             "received"
                         ]
                     },
-                    "score": {
-                        "type": [
-                            "number",
-                            "null"
-                        ],
-                        "description": "The score of the reference: the weighted average of the scored questions, rounded to two decimals. Null when the client does not use scoring, when the form has no scoring criteria, or when the answers did not match any criterion. It is also null until the reference is completed.",
-                        "examples": [
-                            4.25
-                        ]
-                    },
-                    "score_breakdown": {
-                        "type": "array",
-                        "description": "How the score was reached: one item per scored question with its `label`, the `value` answered, the `raw_score`, the `weight` and the `weighted_score`. Empty when the client does not use scoring or the reference is not scored.",
-                        "examples": [
-                            [
-                                {
-                                    "label": "Reliability",
-                                    "value": "Excellent",
-                                    "raw_score": 5,
-                                    "weight": 1,
-                                    "weighted_score": 5
-                                }
-                            ]
-                        ],
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "label": {
-                                    "type": "string"
-                                },
-                                "value": [],
-                                "raw_score": {
-                                    "type": "number"
-                                },
-                                "weight": {
-                                    "type": "number"
-                                },
-                                "weighted_score": {
-                                    "type": "number"
-                                }
-                            },
-                            "required": [
-                                "label",
-                                "value",
-                                "raw_score",
-                                "weight",
-                                "weighted_score"
-                            ]
-                        }
-                    },
                     "decline_reason": {
                         "type": [
                             "string",
@@ -54261,8 +54200,6 @@
                     "status",
                     "status_label",
                     "display_status",
-                    "score",
-                    "score_breakdown",
                     "decline_reason",
                     "answers",
                     "has_pdf",
@@ -62589,15 +62526,6 @@
                         "description": "The candidate's `candidate_ref` (the Hub uuid the APIs use). The candidate's name and email are never in the webhook; read them with `GET /api/v2/references/requests/{uuid}` or the Hub core API. Always present: a candidate that has no ref yet is given one when the event is built.",
                         "example": "9f1c2d3e-4b5a-4c6d-8e7f-0a1b2c3d4e5f"
                     },
-                    "score": {
-                        "type": [
-                            "string",
-                            "null"
-                        ],
-                        "pattern": "^\\d+\\.\\d{2}$",
-                        "description": "The score of the reference as a decimal string with two decimals (for example `\"4.25\"`: a string, not a JSON number), as stored by the references engine. Null when the client does not use scoring or the answers could not be scored. `GET /referees/{uuid}` returns the same score as a number, and only to clients that use scoring.",
-                        "example": "4.25"
-                    },
                     "submitted_at": {
                         "format": "date-time",
                         "type": "string",
@@ -62609,14 +62537,12 @@
                     "reference_uuid",
                     "reference_request_uuid",
                     "candidate_ref",
-                    "score",
                     "submitted_at"
                 ],
                 "example": {
                     "reference_uuid": "3f2504e0-4f89-41d3-9a0c-0305e82c3301",
                     "reference_request_uuid": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
                     "candidate_ref": "9f1c2d3e-4b5a-4c6d-8e7f-0a1b2c3d4e5f",
-                    "score": "4.25",
                     "submitted_at": "2026-10-30T14:02:11Z"
                 }
             },

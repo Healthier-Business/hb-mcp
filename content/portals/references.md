@@ -4,7 +4,7 @@ Base URL: `https://hub.hbcompliance.co.uk/api/v2/references/`. Portal key `refer
 
 ## 0. How a reference request works
 
-A reference request asks one or more referees to vouch for one candidate. You create it for a candidate (`candidate_ref`) with `POST /requests`. You choose who gives the referee details: with `client_adds` you send the referees in the same call and each is emailed at once with a private link to the form; with `candidate_provides` the candidate is emailed a link to a public page (the `submission_url`) where they enter their referees, and each is then emailed automatically. A referee opens the link in their own browser and either submits the form or declines; there is no API call that answers for a referee. Hub tells you by webhook (`reference.submitted`, `reference.declined`, and `reference.all_completed` once enough references are in) and you read the outcome with `GET /requests/{uuid}`, `GET /referees/{uuid}` (answers and score) and `GET /referees/{uuid}/pdf`. While a referee has not answered you can chase them (`POST /requests/{uuid}/reminders` for everyone who is due, `POST /referees/{uuid}/reminder` for one), add a replacement or extra referee (`POST /requests/{uuid}/referees`), give more time (`POST /requests/{uuid}/extend`) or give up (`POST /requests/{uuid}/cancel`). A request that is not completed expires at `expires_at`.
+A reference request asks one or more referees to vouch for one candidate. You create it for a candidate (`candidate_ref`) with `POST /requests`. You choose who gives the referee details: with `client_adds` you send the referees in the same call and each is emailed at once with a private link to the form; with `candidate_provides` the candidate is emailed a link to a public page (the `submission_url`) where they enter their referees, and each is then emailed automatically. A referee opens the link in their own browser and either submits the form or declines; there is no API call that answers for a referee. Hub tells you by webhook (`reference.submitted`, `reference.declined`, and `reference.all_completed` once enough references are in) and you read the outcome with `GET /requests/{uuid}`, `GET /referees/{uuid}` (answers) and `GET /referees/{uuid}/pdf`. While a referee has not answered you can chase them (`POST /requests/{uuid}/reminders` for everyone who is due, `POST /referees/{uuid}/reminder` for one), add a replacement or extra referee (`POST /requests/{uuid}/referees`), give more time (`POST /requests/{uuid}/extend`) or give up (`POST /requests/{uuid}/cancel`). A request that is not completed expires at `expires_at`.
 
 A request has the status `pending` (no referee has been emailed yet), `in_progress`, `completed` (the number of references required is in), `cancelled` or `expired`. A referee has the status `pending`, `sent`, `opened`, `in_progress`, `completed`, `declined`, `expired` or `bounced`; the last four are final. Nothing in References uses credits: no call charges anything.
 
@@ -71,9 +71,9 @@ Side effects of a create: for `client_adds` each referee is emailed at once and 
 
 ### 3.2 Referees
 
-`GET /referees/{uuid}`: `uuid`, `reference_request_uuid`, `candidate_ref`, `candidate_name`, `candidate_email`, `referee` (name, email, organisation, position, phone, relationship_to_candidate), `status`, `status_label`, `display_status`, `score`, `score_breakdown`, `decline_reason`, `answers` (list of `field_code`, `label`, `value`), `has_pdf`, `sent_at`, `opened_at`, `submitted_at`, `expires_at`, `reminder_count`, `last_reminder_at`.
+`GET /referees/{uuid}`: `uuid`, `reference_request_uuid`, `candidate_ref`, `candidate_name`, `candidate_email`, `referee` (name, email, organisation, position, phone, relationship_to_candidate), `status`, `status_label`, `display_status`, `decline_reason`, `answers` (list of `field_code`, `label`, `value`), `has_pdf`, `sent_at`, `opened_at`, `submitted_at`, `expires_at`, `reminder_count`, `last_reminder_at`.
 
-`score` is set only when the client uses scoring and the answers could be scored; otherwise `score` is `null` and `score_breakdown` is `[]`. `decline_reason` is the referee's free text and is set only when the status is `declined`. `answers` omits the referee's own contact details (they are in `referee`); a question the form no longer has is labelled with its `field_code`.
+`decline_reason` is the referee's free text and is set only when the status is `declined`. `answers` omits the referee's own contact details (they are in `referee`); a question the form no longer has is labelled with its `field_code`.
 
 `GET /referees/{uuid}/pdf`: the PDF of a completed reference, as an attachment named `reference-{referee-name}-{uuid}.pdf`; a PDF that is missing from storage is built from the stored answers for that response only, nothing is saved (the call is read only). `404 pdf_not_available` for any reference that is not completed. `POST /referees/{uuid}/reminder` (scope `references:requests:write`): `data.sent: true` and `data.reminder_count`; the same rules as the batch call, and when none can be sent `409 reminder_not_sent` with the referee and reason in `message`.
 
@@ -89,7 +89,7 @@ Delivery, signature headers and retries are those of Hub webhooks (`/api/v2/webh
 | --- | --- | --- |
 | `reference.request.created` | a request was created (API, Hub, or staff), after the emails are queued | `uuid`, `candidate_ref`, `collection_mode`, `references_required`, `expires_at` |
 | `candidate.referees.submitted` | the candidate gave their referees | `reference_request_uuid`, `candidate_ref`, `referees_added` |
-| `reference.submitted` | a referee submitted (`score` is a string such as `"4.25"`, or `null`) | `reference_uuid`, `reference_request_uuid`, `candidate_ref`, `score`, `submitted_at` |
+| `reference.submitted` | a referee submitted | `reference_uuid`, `reference_request_uuid`, `candidate_ref`, `submitted_at` |
 | `reference.declined` | a referee declined | `reference_uuid`, `reference_request_uuid`, `candidate_ref`, `has_decline_reason` |
 | `reference.expired` | a reference expired: the scheduled expiry job (where switched on), or each unfinished referee when a request is cancelled | `reference_uuid`, `reference_request_uuid`, `candidate_ref`, `expired_at` |
 | `reference.reminder.sent` | a reminder went to a referee (any source) | `reference_uuid`, `reference_request_uuid`, `candidate_ref`, `reminder_number` |
@@ -250,13 +250,12 @@ On 30 October Dr Carter submits the form in her browser. Hub posts to every endp
     "reference_uuid": "3f2504e0-4f89-41d3-9a0c-0305e82c3301",
     "reference_request_uuid": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
     "candidate_ref": "9f1c2d3e-4b5a-4c6d-8e7f-0a1b2c3d4e5f",
-    "score": null,
     "submitted_at": "2026-10-30T14:02:11Z"
   }
 }
 ```
 
-The event carries no answers and no name or email: it only tells you which reference to fetch. `score` is `null` for a client that does not use scoring, and otherwise a string such as `"4.25"`. When the second reference arrives `reference.all_completed` follows with `references_completed` 2 and `references_required` 2.
+The event carries no answers and no name or email: it only tells you which reference to fetch. When the second reference arrives `reference.all_completed` follows with `references_completed` 2 and `references_required` 2.
 
 ### 6.4 Fetch the reference and the PDF
 
@@ -283,8 +282,6 @@ GET /api/v2/references/referees/3f2504e0-4f89-41d3-9a0c-0305e82c3301
     "status": "completed",
     "status_label": "Completed",
     "display_status": "received",
-    "score": null,
-    "score_breakdown": [],
     "decline_reason": null,
     "answers": [
       { "field_code": "reliability", "label": "Reliability", "value": "Excellent" },
