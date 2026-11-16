@@ -2084,7 +2084,7 @@
             "get": {
                 "operationId": "hub.candidates.list",
                 "summary": "List candidates",
-                "description": "Lists the client's candidates in Hub, the people every other portal API refers to. `candidate_ref` is the uuid that identifies a person in all of them: take it from here, or from the answer of `POST /hub/candidates`, and use it in paths, bodies and filters of the portal APIs. Each row shows identity, roles, the overall compliance status and the next expiry date; the services a candidate has with each portal are on `GET /hub/candidates/{candidate_ref}`. Inactive candidates are listed too (`is_active` false); filter them out with `is_active=true`.\n\nFilters: `search` (every word must match the name, email, a role or your own `candidate_reference`; at most 100 characters), `status` or `compliance_status` (the same filter under two names: `compliant`, `expiring_soon`, `expired`, `pending` or `na`), `role` (an exact role name the candidate holds), `is_active` (`true` or `false`), `added_from` / `added_to` (when the candidate was added) and `updated_from` / `updated_to` (when they were last changed). Each range works on whole UTC days: `_from` is the start of the UTC day of the value, `_to` its end, so a time of day in the value is ignored; a `_to` before the `_from` is `422` on `_to`. `sort` accepts `name` (the default, ascending), `email`, `added_at` and `updated_at`; prefix with `-` for descending. The list is paged with `page` and `per_page` (1 to 100, default 25); a page past the last is empty and `meta.total` stays correct.\n\nUse it to find a candidate before creating one (an email address can exist once per client) and to keep your own records in step: poll with `updated_from` set to the last time you looked. The key needs the scope `hub:candidates:read`. Read only: nothing is changed, sent or charged. Errors: `422 validation_failed` for a bad filter, date, `sort` or paging value; the standard `401`, `403` and `429` of every call.",
+                "description": "Lists the client's candidates in Hub, the people every other portal API refers to. `candidate_ref` is the uuid that identifies a person in all of them: take it from here, or from the answer of `POST /hub/candidates`, and use it in paths, bodies and filters of the portal APIs. Each row shows identity, roles, the overall compliance status and the next expiry date; the services a candidate has with each portal are on `GET /hub/candidates/{candidate_ref}`. Inactive candidates are listed too (`is_active` false); filter them out with `is_active=true`.\n\nFilters: `search` (every word must match the name, email, a role or your own `candidate_reference`; at most 100 characters), `status` or `compliance_status` (the same filter under two names: `compliant`, `expiring_soon`, `expired`, `pending` or `na`), `role` (an exact role name the candidate holds), `is_active` (`true` or `false`), `added_from` / `added_to` (when the candidate was added) and `updated_from` / `updated_to` (when they were last changed) and `last_login_from` / `last_login_to` (when they last signed in; a candidate who never has is never listed by these). Each range works on whole UTC days: `_from` is the start of the UTC day of the value, `_to` its end, so a time of day in the value is ignored; a `_to` before the `_from` is `422` on `_to`. `sort` accepts `name` (the default, ascending), `email`, `added_at` and `updated_at`; prefix with `-` for descending. The list is paged with `page` and `per_page` (1 to 100, default 25); a page past the last is empty and `meta.total` stays correct.\n\nUse it to find a candidate before creating one (an email address can exist once per client) and to keep your own records in step: poll with `updated_from` set to the last time you looked. The key needs the scope `hub:candidates:read`. Read only: nothing is changed, sent or charged. Errors: `422 validation_failed` for a bad filter, date, `sort` or paging value; the standard `401`, `403` and `429` of every call.",
                 "tags": [
                     "Hub (core)"
                 ],
@@ -2187,6 +2187,26 @@
                         "in": "query",
                         "required": false,
                         "description": "Only rows whose `added` date is on or before this date: the end of that day in UTC. Any date (`2026-10-31`) or ISO 8601 time. Must not be before the matching `added_from`.",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "example": "2026-10-31"
+                    },
+                    {
+                        "name": "last_login_from",
+                        "in": "query",
+                        "required": false,
+                        "description": "Only rows whose `last_login` date is on or after this date: the start of that day in UTC. Any date (`2026-10-01`) or ISO 8601 time. Must not be after the matching `last_login_to`.",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "example": "2026-10-01"
+                    },
+                    {
+                        "name": "last_login_to",
+                        "in": "query",
+                        "required": false,
+                        "description": "Only rows whose `last_login` date is on or before this date: the end of that day in UTC. Any date (`2026-10-31`) or ISO 8601 time. Must not be before the matching `last_login_from`.",
                         "schema": {
                             "type": "string"
                         },
@@ -2317,6 +2337,8 @@
                                             "compliance_status": "compliant",
                                             "next_expiry_date": "2027-03-31",
                                             "added_at": "2026-10-28T19:53:24Z",
+                                            "username": "jane.doe",
+                                            "last_login_at": "2026-10-28T19:53:24Z",
                                             "updated_at": "2026-10-28T19:53:24Z"
                                         }
                                     ],
@@ -2588,6 +2610,8 @@
                                         "compliance_status": "compliant",
                                         "next_expiry_date": "2027-03-31",
                                         "added_at": "2026-10-28T19:53:24Z",
+                                        "username": "jane.doe",
+                                        "last_login_at": "2026-10-28T19:53:24Z",
                                         "updated_at": "2026-10-28T19:53:24Z",
                                         "compliance": {
                                             "compliant": 5,
@@ -2745,6 +2769,8 @@
                                         "compliance_status": "compliant",
                                         "next_expiry_date": "2027-03-31",
                                         "added_at": "2026-10-28T19:53:24Z",
+                                        "username": "jane.doe",
+                                        "last_login_at": "2026-10-28T19:53:24Z",
                                         "updated_at": "2026-10-28T19:53:24Z",
                                         "compliance": {
                                             "compliant": 5,
@@ -3005,6 +3031,8 @@
                                         "compliance_status": "compliant",
                                         "next_expiry_date": "2027-03-31",
                                         "added_at": "2026-10-28T19:53:24Z",
+                                        "username": "jane.doe",
+                                        "last_login_at": "2026-10-28T19:53:24Z",
                                         "updated_at": "2026-10-28T19:53:24Z",
                                         "compliance": {
                                             "compliant": 5,
@@ -45527,6 +45555,24 @@
                         "format": "date-time",
                         "description": "When the candidate was added to Hub."
                     },
+                    "username": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "The username the candidate signs in with; null when it is not known.",
+                        "examples": [
+                            "jane.doe"
+                        ]
+                    },
+                    "last_login_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time",
+                        "description": "When the candidate last signed in; null when they never have."
+                    },
                     "updated_at": {
                         "type": [
                             "string",
@@ -45551,6 +45597,8 @@
                     "compliance_status",
                     "next_expiry_date",
                     "added_at",
+                    "username",
+                    "last_login_at",
                     "updated_at"
                 ],
                 "title": "HubCandidate"
@@ -45690,6 +45738,24 @@
                         ],
                         "format": "date-time",
                         "description": "When the candidate was added to Hub."
+                    },
+                    "username": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "The username the candidate signs in with; null when it is not known.",
+                        "examples": [
+                            "jane.doe"
+                        ]
+                    },
+                    "last_login_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time",
+                        "description": "When the candidate last signed in; null when they never have."
                     },
                     "updated_at": {
                         "type": [
@@ -45837,6 +45903,8 @@
                     "compliance_status",
                     "next_expiry_date",
                     "added_at",
+                    "username",
+                    "last_login_at",
                     "updated_at",
                     "compliance",
                     "services"
