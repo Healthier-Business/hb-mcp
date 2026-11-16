@@ -16782,7 +16782,7 @@
             "get": {
                 "operationId": "online-training.candidates.list",
                 "summary": "List candidates with training",
-                "description": "Lists the account's candidates who have Online Training (candidates that were archived are left out), ordered by first name, then last name unless you sort. A candidate is identified by `candidate_ref`, the uuid of the Hub core API, where candidates are created and edited; here you only read their training. Each row has identity (read only), `account_status` (`active` once the candidate has activated their login, `pending` before), `training_status`, the counts of courses assigned, completed and expired, who pays (`paid_by`), `renewal_mode`, `completed_at` and `expires_at`. `training_status` is null for a candidate with no course assigned.\n\nFilters: `search` (every word must match the first name, last name or email), `candidate_ref` (one candidate; an unknown or other client's reference gives an empty list, not an error), `status` (`up_to_date`, `expiring_soon`, `expired` or `not_completed`; only candidates with courses are matched), `enrolled` (`true` for candidates with courses, `false` for none), `course_id` (candidates who have that course assigned) and `expires_from` / `expires_to` (on `expires_at`, each bound a whole UTC day). `sort` accepts `first_name`, `last_name`, `email` and `expires_at`; prefix with `-` for descending. Paged with `page` and `per_page` (1 to 100, default 25).\n\nA candidate who exists in Hub but has never been given online training is not listed (assign a course to start them). The status buckets are the ones Hub stores for its dashboard, so a filtered list matches the dashboard tiles. The key needs the scope `online-training:candidates:read`. Read only: nothing is changed, sent or charged.",
+                "description": "Lists the account's candidates who have Online Training (candidates that were archived are left out), ordered by first name, then last name unless you sort. A candidate is identified by `candidate_ref`, the uuid of the Hub core API, where candidates are created and edited; here you only read their training. Each row has identity (read only), `account_status` (`active` once the candidate has activated their login, `pending` before), `training_status`, the counts of courses assigned, completed and expired, who pays (`paid_by`), `renewal_mode`, `completed_at` and `expires_at`. `training_status` is null for a candidate with no course assigned.\n\nFilters: `search` (every word must match the first name, last name or email), `candidate_ref` (one candidate; an unknown or other client's reference gives an empty list, not an error), `status` (`up_to_date`, `expiring_soon`, `expired` or `not_completed`; only candidates with courses are matched), `enrolled` (`true` for candidates with courses, `false` for none), `course_id` (candidates who have that course assigned), `completed_from` / `completed_to` (on `completed_at`, the date of the candidate's latest completion: poll with `completed_from` set to the last time you looked to find who completed something since) and `expires_from` / `expires_to` (on `expires_at`). Each bound is a whole UTC day: `_from` is the start of the day of the value, `_to` its end, so a time of day in the value is ignored; a `_to` before its `_from` is `422` on `_to`, and a candidate who has never completed a course is never matched by the `completed` pair. `sort` accepts `first_name`, `last_name`, `email`, `completed_at` and `expires_at`; prefix with `-` for descending. Paged with `page` and `per_page` (1 to 100, default 25).\n\nA candidate who exists in Hub but has never been given online training is not listed (assign a course to start them). The status buckets are the ones Hub stores for its dashboard, so a filtered list matches the dashboard tiles. The key needs the scope `online-training:candidates:read`. Read only: nothing is changed, sent or charged.",
                 "tags": [
                     "Online Training"
                 ],
@@ -16823,7 +16823,7 @@
                         "name": "sort",
                         "in": "query",
                         "required": false,
-                        "description": "The field to sort by, one only: `first_name`, `last_name`, `email`, `expires_at`. Prefix with `-` for descending (`-first_name`). Without `sort` the list has a fixed order that is stable between pages. Any other value is a 422.",
+                        "description": "The field to sort by, one only: `first_name`, `last_name`, `email`, `completed_at`, `expires_at`. Prefix with `-` for descending (`-first_name`). Without `sort` the list has a fixed order that is stable between pages. Any other value is a 422.",
                         "schema": {
                             "type": "string",
                             "enum": [
@@ -16833,6 +16833,8 @@
                                 "-last_name",
                                 "email",
                                 "-email",
+                                "completed_at",
+                                "-completed_at",
                                 "expires_at",
                                 "-expires_at"
                             ]
@@ -16849,6 +16851,26 @@
                             "maxLength": 100
                         },
                         "example": "smith"
+                    },
+                    {
+                        "name": "completed_from",
+                        "in": "query",
+                        "required": false,
+                        "description": "Only rows whose `completed` date is on or after this date: the start of that day in UTC. Any date (`2026-10-01`) or ISO 8601 time. Must not be after the matching `completed_to`.",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "example": "2026-10-01"
+                    },
+                    {
+                        "name": "completed_to",
+                        "in": "query",
+                        "required": false,
+                        "description": "Only rows whose `completed` date is on or before this date: the end of that day in UTC. Any date (`2026-10-31`) or ISO 8601 time. Must not be before the matching `completed_from`.",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "example": "2026-10-31"
                     },
                     {
                         "name": "expires_from",
