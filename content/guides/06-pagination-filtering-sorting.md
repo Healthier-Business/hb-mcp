@@ -92,7 +92,7 @@ Other filters are named after the field they filter, for example `status=expired
 
 ### Date ranges
 
-Fields that hold a date or time have a pair of filters called `{name}_from` and `{name}_to`. The Hub candidate list has `updated_from` and `updated_to`, and `added_from` and `added_to`. Other endpoints have `created_from`, `start_date_from` and so on, and each endpoint's page names its own.
+Fields that hold a date or time have a pair of filters called `{name}_from` and `{name}_to`. The Hub candidate list has `updated_from` and `updated_to`, and `added_from` and `added_to`, and `last_login_from` and `last_login_to` (when a candidate last signed in). Other endpoints have `created_from`, `start_date_from` and so on, and each endpoint's page names its own.
 
 You may send a plain date (`2026-10-01`) or a full ISO 8601 time (`2026-10-01T09:30:00Z`). Both ends are inclusive. `_from` means "from the start of that day" and `_to` means "to the end of that day", both in UTC. So `updated_from=2026-10-01&updated_to=2026-10-01` returns everything changed during that one UTC day. In Clinical Interviews and Practical Training a plain date means a UK calendar day instead (Europe/London, so a day in summer starts at 23:00 UTC the evening before); the portal pages say which filters this applies to. A value that is not a date is a `422`, and so is a `_from` that is later than the `_to`; the error is reported on the `_to` field.
 

@@ -2320,6 +2320,7 @@
                                     "data": [
                                         {
                                             "candidate_ref": "9f1c2d3e-4b5a-4c6d-8e7f-0a1b2c3d4e5f",
+                                            "hb_candidate_id": 1233851,
                                             "first_name": "Jane",
                                             "last_name": "Doe",
                                             "name": "Jane Doe",
@@ -2593,6 +2594,7 @@
                                 "example": {
                                     "data": {
                                         "candidate_ref": "9f1c2d3e-4b5a-4c6d-8e7f-0a1b2c3d4e5f",
+                                        "hb_candidate_id": 1233851,
                                         "first_name": "Jane",
                                         "last_name": "Doe",
                                         "name": "Jane Doe",
@@ -2752,6 +2754,7 @@
                                 "example": {
                                     "data": {
                                         "candidate_ref": "9f1c2d3e-4b5a-4c6d-8e7f-0a1b2c3d4e5f",
+                                        "hb_candidate_id": 1233851,
                                         "first_name": "Jane",
                                         "last_name": "Doe",
                                         "name": "Jane Doe",
@@ -3014,6 +3017,7 @@
                                 "example": {
                                     "data": {
                                         "candidate_ref": "9f1c2d3e-4b5a-4c6d-8e7f-0a1b2c3d4e5f",
+                                        "hb_candidate_id": 1233851,
                                         "first_name": "Jane",
                                         "last_name": "Doe",
                                         "name": "Jane Doe",
@@ -16967,6 +16971,7 @@
                                     "data": [
                                         {
                                             "candidate_ref": "9f1c2d3e-4b5a-4c6d-8e7f-0a1b2c3d4e5f",
+                                            "hb_candidate_id": 1233851,
                                             "first_name": "Jane",
                                             "last_name": "Doe",
                                             "email": "jane.doe@example.com",
@@ -17108,6 +17113,7 @@
                                 "example": {
                                     "data": {
                                         "candidate_ref": "9f1c2d3e-4b5a-4c6d-8e7f-0a1b2c3d4e5f",
+                                        "hb_candidate_id": 1233851,
                                         "first_name": "Jane",
                                         "last_name": "Doe",
                                         "email": "jane.doe@example.com",
@@ -17923,6 +17929,7 @@
                                         "credits_charged": 0,
                                         "candidate": {
                                             "candidate_ref": "9f1c2d3e-4b5a-4c6d-8e7f-0a1b2c3d4e5f",
+                                            "hb_candidate_id": 1233851,
                                             "first_name": "Jane",
                                             "last_name": "Doe",
                                             "email": "jane.doe@example.com",
@@ -45430,6 +45437,16 @@
                             "9f1c2d3e-4b5a-4c6d-8e7f-0a1b2c3d4e5f"
                         ]
                     },
+                    "hb_candidate_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "The candidate's id in the HB Portal: the number the old API called `candidate_id`, and the `portal_id` of the Online Training service. It is not the Hub's own id (which is never exposed), and it is for matching records you already hold: `candidate_ref` is what every API call takes.",
+                        "examples": [
+                            1233851
+                        ]
+                    },
                     "first_name": {
                         "type": "string",
                         "description": "The candidate's first name.",
@@ -45584,6 +45601,7 @@
                 },
                 "required": [
                     "candidate_ref",
+                    "hb_candidate_id",
                     "first_name",
                     "last_name",
                     "name",
@@ -45612,6 +45630,16 @@
                         "description": "The uuid that identifies this person in every portal API. Use it in paths and filters of the other APIs.",
                         "examples": [
                             "9f1c2d3e-4b5a-4c6d-8e7f-0a1b2c3d4e5f"
+                        ]
+                    },
+                    "hb_candidate_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "The candidate's id in the HB Portal: the number the old API called `candidate_id`, and the `portal_id` of the Online Training service. It is not the Hub's own id (which is never exposed), and it is for matching records you already hold: `candidate_ref` is what every API call takes.",
+                        "examples": [
+                            1233851
                         ]
                     },
                     "first_name": {
@@ -45890,6 +45918,7 @@
                 },
                 "required": [
                     "candidate_ref",
+                    "hb_candidate_id",
                     "first_name",
                     "last_name",
                     "name",
@@ -49090,9 +49119,16 @@
                                     "null"
                                 ],
                                 "format": "uuid",
-                                "description": "The candidate's Hub uuid (`candidate_ref`). The portal's own integer id is never exposed. Candidates are created and edited in the Hub core API.",
+                                "description": "The candidate's Hub uuid (`candidate_ref`), the id every call takes. Candidates are created and edited in the Hub core API.",
                                 "examples": [
                                     "9f1c2d3e-4b5a-4c6d-8e7f-0a1b2c3d4e5f"
+                                ]
+                            },
+                            "hb_candidate_id": {
+                                "type": "integer",
+                                "description": "The candidate's id in the HB Portal: the number the old API called `candidate_id`. It is for matching records you already hold; `candidate_ref` is what every API call takes.",
+                                "examples": [
+                                    1233851
                                 ]
                             },
                             "first_name": {
@@ -49239,6 +49275,7 @@
                         },
                         "required": [
                             "candidate_ref",
+                            "hb_candidate_id",
                             "first_name",
                             "last_name",
                             "email",
@@ -49275,9 +49312,16 @@
                             "null"
                         ],
                         "format": "uuid",
-                        "description": "The candidate's Hub uuid (`candidate_ref`). The portal's own integer id is never exposed. Candidates are created and edited in the Hub core API.",
+                        "description": "The candidate's Hub uuid (`candidate_ref`), the id every call takes. Candidates are created and edited in the Hub core API.",
                         "examples": [
                             "9f1c2d3e-4b5a-4c6d-8e7f-0a1b2c3d4e5f"
+                        ]
+                    },
+                    "hb_candidate_id": {
+                        "type": "integer",
+                        "description": "The candidate's id in the HB Portal: the number the old API called `candidate_id`. It is for matching records you already hold; `candidate_ref` is what every API call takes.",
+                        "examples": [
+                            1233851
                         ]
                     },
                     "first_name": {
@@ -49424,6 +49468,7 @@
                 },
                 "required": [
                     "candidate_ref",
+                    "hb_candidate_id",
                     "first_name",
                     "last_name",
                     "email",
@@ -49451,9 +49496,16 @@
                             "null"
                         ],
                         "format": "uuid",
-                        "description": "The candidate's Hub uuid (`candidate_ref`). The portal's own integer id is never exposed. Candidates are created and edited in the Hub core API.",
+                        "description": "The candidate's Hub uuid (`candidate_ref`), the id every call takes. Candidates are created and edited in the Hub core API.",
                         "examples": [
                             "9f1c2d3e-4b5a-4c6d-8e7f-0a1b2c3d4e5f"
+                        ]
+                    },
+                    "hb_candidate_id": {
+                        "type": "integer",
+                        "description": "The candidate's id in the HB Portal: the number the old API called `candidate_id`. It is for matching records you already hold; `candidate_ref` is what every API call takes.",
+                        "examples": [
+                            1233851
                         ]
                     },
                     "first_name": {
@@ -49655,6 +49707,7 @@
                 },
                 "required": [
                     "candidate_ref",
+                    "hb_candidate_id",
                     "first_name",
                     "last_name",
                     "email",
