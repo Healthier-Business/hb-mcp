@@ -58,7 +58,7 @@ Every request has **one id that never changes**. A request created through `POST
 
 ### 4.1 Account and catalogue
 
-`GET /profile` (`account:read`): `id` (the client id), `name`, `notifications` (`hb`, `agency`, `both`), `document_upload`, `allows_uploads`, `ftw_routing_configured`, `credit_balance`, `credits_deducting`.
+`GET /profile` (`account:read`): `id` (the client id), `name`, `notifications` (`hb` or `both`), `document_upload` (always `both`), `allows_uploads` (always `true`), `ftw_routing_configured`, `credit_balance`, `credits_deducting`.
 
 `GET /settings` (`account:read`): `notifications`, `return_email`, `copy_emails`, `document_upload`, `allow_upload`, `allow_temporary_clearance`, `chase` (`first_reminder_days`, `interval_days`, `max_emails`, `stop_after_days`, `notify_on_limit`), `emails` (list of `id`, `email`, `purpose`, `type`). Read only.
 
