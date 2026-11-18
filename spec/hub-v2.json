@@ -17213,7 +17213,7 @@
             "get": {
                 "operationId": "online-training.candidates.access",
                 "summary": "Get a candidate's training access",
-                "description": "Returns where the candidate stands with their training access, worked out by Hub: `groups` (one per course group the candidate has: `group_id`, `title`, `payer`, `status`, `expires_at` and `renewal`), the `terms` (`accepted`, `version`, `accepted_at`), the `renewal` block (`mode` is `auto` or `manual`, `open_request` says a renewal request waits for approval) and a `quote` for starting the groups that need access. `payer` is `client` when the account's credits pay for the group and `candidate` when the candidate pays; Hub decides it and it cannot be changed through the API. `status` is `not_started`, `payment_pending`, `awaiting_approval`, `active`, `expiring` or `expired`; the candidate can open courses only in `active` and `expiring`.\n\n`quote.agency` (null when no group needing access is agency-paid) holds `credits_needed`, the `balance` the account can spend, `can_afford` and the credits per group. `quote.candidate` (null when none is candidate-paid) holds the price in pence (`net_pence`, `vat_pence`, `gross_pence`, and per group), and `allow_24_months` with `gross_pence_24_months` when the account lets candidates pre-pay a second year. To start access call `POST /candidates/{candidate_ref}/access/start`. Another client's candidate, an unknown one and a malformed `candidate_ref` answer `404 not_found`. The key needs the scope `online-training:candidates:read`. Read only: nothing is changed, charged or sent.",
+                "description": "Returns where the candidate stands with their training access, worked out by Hub: `access` (the one training access in a line: `status`, `expires_at`, `payer` and `single_period`, which says one running period covers every course group, so courses assigned meanwhile open at once with the same end date), `groups` (one per course group the candidate has: `group_id`, `title`, `payer`, `status`, `expires_at` and `renewal`), the `terms` (`accepted`, `version`, `accepted_at`), the `renewal` block (`mode` is `auto` or `manual`, `open_request` says a renewal request waits for approval) and a `quote` for starting the groups that need access. `payer` is `client` when the account's credits pay for the group and `candidate` when the candidate pays; Hub decides it and it cannot be changed through the API. `status` is `not_started`, `payment_pending`, `awaiting_approval`, `active`, `expiring` or `expired`; the candidate can open courses only in `active` and `expiring`.\n\n`quote.agency` (null when no group needing access is agency-paid) holds `credits_needed`, the `balance` the account can spend, `can_afford` and the credits per group. `quote.candidate` (null when none is candidate-paid) holds the price in pence (`net_pence`, `vat_pence`, `gross_pence`, and per group), and `allow_24_months` with `gross_pence_24_months` when the account lets candidates pre-pay a second year. To start access call `POST /candidates/{candidate_ref}/access/start`. Another client's candidate, an unknown one and a malformed `candidate_ref` answer `404 not_found`. The key needs the scope `online-training:candidates:read`. Read only: nothing is changed, charged or sent.",
                 "tags": [
                     "Online Training"
                 ],
@@ -17269,6 +17269,12 @@
                                 "example": {
                                     "data": {
                                         "candidate_ref": "9f1c2d3e-4b5a-4c6d-8e7f-0a1b2c3d4e5f",
+                                        "access": {
+                                            "status": "active",
+                                            "expires_at": "2027-10-31T10:20:30Z",
+                                            "payer": "client",
+                                            "single_period": true
+                                        },
                                         "groups": [
                                             {
                                                 "group_id": 1,
@@ -17501,7 +17507,7 @@
             "post": {
                 "operationId": "online-training.candidates.access.start",
                 "summary": "Start a candidate's training access",
-                "description": "Starts the candidate's access to the course groups that need it, as the candidate's own Start button does, and answers what happened. Hub decides who pays each group (the group's setting, else the candidate's `training_charge`); the request cannot change it, and a candidate-paid group is never paid from credits. Agency-paid groups are charged to the account's credits in one transaction (nothing is taken when the balance does not cover them all), groups that cost nothing are opened free. `group_ids` (optional) limits the start to some of the candidate's groups that need access now; leave it out to start every one. `months` (`12` or `24`, default `12`) only matters for candidate-paid groups and is used only when the account allows the 24 month option.\n\nSend an `Idempotency-Key` header (at most 255 characters) so a retry after a lost answer starts and charges once: the same key and body within 24 hours returns the first answer with `Idempotent-Replayed: true`; only a success is remembered. A second call without a key finds nothing left to start and answers `none`. Each call that switches access on queues one `online-training.access.started` webhook. At most 30 calls a minute per key and 5 a minute per candidate; more is `429 rate_limited`. Two optional daily stops per key can be switched on for the account's integration: a cap on the credits it may spend through the API and a cap on the access starts, each answering `429 credit_cap_reached` or `429 start_cap_reached` before anything is charged (off by default).\n\nWhen some groups are candidate-paid the call also creates a one-time payment link: `payment.url` is a Hub page you give to the candidate (it is shown only in this answer). The candidate agrees to the payment terms and pays through HB Pay; only HB Pay's confirmation switches the access on, and then `online-training.access.started` fires with `source` `payment`. The link works for 7 days or until it is paid, and a newer link for the same candidate replaces it (the older one is `superseded`). Read its status with `GET /candidates/{candidate_ref}/access/payments/{payment_id}`. `return_url` (optional) must be on one of the origins registered under Developer, Embed; the payment pages then offer a \"Back to\" button to it.\n\nSend `max_credits` (decimal, optional) to refuse a start that costs more than you expect: when the credits the account would pay now are higher the answer is `409 quote_changed` (`details` holds the current `credits_needed`, `balance` and `can_afford`) and nothing is started, charged or created (no payment link either). Leave it out and the call behaves as before.\n\nAnswers: `200` with `outcome` `enabled` (`credits_charged`, `balance_after` and the `groups` switched on with their `expires_at`), `none` (nothing needed access), `payment_required` (the candidate pays for the groups: `payment` holds the link; nothing else was started) or `partial` (the same, and the groups the account pays were started: see `started`). Errors: `402 insufficient_credits` (nothing was charged or started; `details` has `needed` and `available`), `409 renewal_list_required` (the account requires candidates to be on its renewal list), `409 renewal_approval_required` (a manual renewal needs approval: the request is recorded and the agency emailed once; `details` has `state`, `payer` and `next`), `503 payments_unavailable` (card payments are not set up, so no link was created and nothing was started), `422 validation_failed` for a `group_ids` entry that is not one of the candidate's groups needing access, a bad `months`, or a `return_url` that is not on one of your registered origins. Another client's candidate and an unknown `candidate_ref` answer `404 not_found`. The key needs the scope `online-training:access:write`.",
+                "description": "Starts the candidate's access to the course groups that need it, as the candidate's own Start button does, and answers what happened. Hub decides who pays each group (the group's setting, else the candidate's `training_charge`); the request cannot change it, and a candidate-paid group is never paid from credits. Agency-paid groups are charged to the account's credits in one transaction (nothing is taken when the balance does not cover them all), groups that cost nothing are opened free. `group_ids` (optional) limits the start to some of the candidate's groups that need access now; leave it out to start every one. `months` (`12` or `24`, default `12`) only matters for candidate-paid groups and is used only when the account allows the 24 month option.\n\nSend an `Idempotency-Key` header (at most 255 characters) so a retry after a lost answer starts and charges once: the same key and body within 24 hours returns the first answer with `Idempotent-Replayed: true`; only a success is remembered. A second call without a key finds nothing left to start and answers `none`. Each call that switches access on queues one `online-training.access.started` webhook. When the candidate's access is already running, groups that had not started open under it free of charge: the answer is `enabled` with those groups, and their webhook has `source` `inherited`. At most 30 calls a minute per key and 5 a minute per candidate; more is `429 rate_limited`. Two optional daily stops per key can be switched on for the account's integration: a cap on the credits it may spend through the API and a cap on the access starts, each answering `429 credit_cap_reached` or `429 start_cap_reached` before anything is charged (off by default).\n\nWhen some groups are candidate-paid the call also creates a one-time payment link: `payment.url` is a Hub page you give to the candidate (it is shown only in this answer). The candidate agrees to the payment terms and pays through HB Pay; only HB Pay's confirmation switches the access on, and then `online-training.access.started` fires with `source` `payment`. The link works for 7 days or until it is paid, and a newer link for the same candidate replaces it (the older one is `superseded`). Read its status with `GET /candidates/{candidate_ref}/access/payments/{payment_id}`. `return_url` (optional) must be on one of the origins registered under Developer, Embed; the payment pages then offer a \"Back to\" button to it.\n\nSend `max_credits` (decimal, optional) to refuse a start that costs more than you expect: when the credits the account would pay now are higher the answer is `409 quote_changed` (`details` holds the current `credits_needed`, `balance` and `can_afford`) and nothing is started, charged or created (no payment link either). Leave it out and the call behaves as before.\n\nAnswers: `200` with `outcome` `enabled` (`credits_charged`, `balance_after` and the `groups` switched on with their `expires_at`), `none` (nothing needed access), `payment_required` (the candidate pays for the groups: `payment` holds the link; nothing else was started) or `partial` (the same, and the groups the account pays were started: see `started`). Errors: `402 insufficient_credits` (nothing was charged or started; `details` has `needed` and `available`), `409 renewal_list_required` (the account requires candidates to be on its renewal list), `409 renewal_approval_required` (a manual renewal needs approval: the request is recorded and the agency emailed once; `details` has `state`, `payer` and `next`), `503 payments_unavailable` (card payments are not set up, so no link was created and nothing was started), `422 validation_failed` for a `group_ids` entry that is not one of the candidate's groups needing access, a bad `months`, or a `return_url` that is not on one of your registered origins. Another client's candidate and an unknown `candidate_ref` answer `404 not_found`. The key needs the scope `online-training:access:write`.",
                 "tags": [
                     "Online Training"
                 ],
@@ -48643,6 +48649,66 @@
                             "9f1c2d3e-4b5a-4c6d-8e7f-0a1b2c3d4e5f"
                         ]
                     },
+                    "access": {
+                        "type": "object",
+                        "description": "The candidate's training access in one line. Hub works it out from the groups below: while any group is open the access is `active` (or `expiring`) and ends when the last open group ends. With one running access period, every course group the candidate has is covered by it (`single_period` is true), including courses assigned while it runs, at no extra charge.",
+                        "properties": {
+                            "status": {
+                                "type": "string",
+                                "description": "`not_started`, `payment_pending`, `awaiting_approval`, `active`, `expiring` or `expired`. The candidate can open courses only in `active` and `expiring`.",
+                                "enum": [
+                                    "not_started",
+                                    "payment_pending",
+                                    "awaiting_approval",
+                                    "active",
+                                    "expiring",
+                                    "expired"
+                                ],
+                                "examples": [
+                                    "active"
+                                ]
+                            },
+                            "expires_at": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
+                                "format": "date-time",
+                                "description": "When the access ends (or ended), ISO 8601; null when it has not started.",
+                                "examples": [
+                                    "2027-10-31T10:20:30Z"
+                                ]
+                            },
+                            "payer": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
+                                "description": "Who pays for the access, decided by Hub: `client` or `candidate`; null when the candidate has no course groups.",
+                                "enum": [
+                                    "client",
+                                    "candidate",
+                                    null
+                                ],
+                                "examples": [
+                                    "client"
+                                ]
+                            },
+                            "single_period": {
+                                "type": "boolean",
+                                "description": "Whether one running access period covers every course group the candidate has, so courses assigned meanwhile open at once with the same end date.",
+                                "examples": [
+                                    true
+                                ]
+                            }
+                        },
+                        "required": [
+                            "status",
+                            "expires_at",
+                            "payer",
+                            "single_period"
+                        ]
+                    },
                     "groups": {
                         "type": "array",
                         "description": "One entry per course group the candidate has, in group id order.",
@@ -48984,6 +49050,7 @@
                 },
                 "required": [
                     "candidate_ref",
+                    "access",
                     "groups",
                     "terms",
                     "renewal",
@@ -60449,7 +60516,7 @@
             },
             "WebhookOnlineTrainingAccessStartedData": {
                 "type": "object",
-                "description": "A candidate's training access was switched on.\n\nWhen it fires: when access to one or more course groups goes from not started (or ended) to active: agency credits were taken, the groups were free, or the candidate paid for them. The routes that do it are your own call to `POST /candidates/{candidate_ref}/access/start` (`started_by` is `api`), the candidate pressing Start on their Hub account (`started_by` is `candidate`) a confirmed candidate payment through the payment link (`source` and `started_by` are `payment`) and the approval of a manual renewal (`source` is `renewal`, `started_by` is `api` for your approve call or `hub` for staff). It is sent once per change: a repeated call, a retried request, a replayed payment confirmation or two starts racing each other that find nothing left to switch on send nothing. Who gets it: every active endpoint of the client that picked `online-training.access.started`.\n\nThe data holds the `candidate_ref`, how it was paid (`source`), who started it, the groups switched on, the credits taken and the period of access. No name or email is sent.",
+                "description": "A candidate's training access was switched on.\n\nWhen it fires: when access to one or more course groups goes from not started (or ended) to active: agency credits were taken, the groups were free, the candidate paid for them, or the groups opened under the candidate's running access period (`source` is `inherited`, nothing charged). The routes that do it are your own call to `POST /candidates/{candidate_ref}/access/start` (`started_by` is `api`), the candidate pressing Start on their Hub account (`started_by` is `candidate`) a confirmed candidate payment through the payment link (`source` and `started_by` are `payment`) and the approval of a manual renewal (`source` is `renewal`, `started_by` is `api` for your approve call or `hub` for staff). It is sent once per change: a repeated call, a retried request, a replayed payment confirmation or two starts racing each other that find nothing left to switch on send nothing. Who gets it: every active endpoint of the client that picked `online-training.access.started`.\n\nThe data holds the `candidate_ref`, how it was paid (`source`), who started it, the groups switched on, the credits taken and the period of access. No name or email is sent.",
                 "properties": {
                     "candidate_ref": {
                         "format": "uuid",
@@ -60459,12 +60526,13 @@
                     },
                     "source": {
                         "type": "string",
-                        "description": "How the access was paid for: `credits` (agency credits were taken), `free` (the groups cost nothing), `payment` (the candidate paid through the payment link) or `renewal` (a manual renewal was approved; the credits taken are in `credits_charged`).",
+                        "description": "How the access was paid for: `credits` (agency credits were taken), `free` (the groups cost nothing), `payment` (the candidate paid through the payment link), `renewal` (a manual renewal was approved; the credits taken are in `credits_charged`) or `inherited` (the groups opened under the candidate's running access period, with the same end date and nothing charged).",
                         "enum": [
                             "credits",
                             "free",
                             "payment",
-                            "renewal"
+                            "renewal",
+                            "inherited"
                         ],
                         "example": "credits"
                     },
