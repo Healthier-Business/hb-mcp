@@ -44019,11 +44019,8 @@
                         "maxLength": 50
                     },
                     "job_role": {
-                        "type": [
-                            "string",
-                            "null"
-                        ],
-                        "description": "The candidate's job role, kept on the booking and shown in the report. At most 255 characters. Optional.",
+                        "type": "string",
+                        "description": "The candidate's job role, kept on the booking and shown in the report. At most 255 characters. Required: a booking without\na job role is refused with `422 validation_failed` on `job_role`.",
                         "examples": [
                             "Registered Nurse"
                         ],
@@ -44123,6 +44120,7 @@
                 "required": [
                     "hold_hash",
                     "candidate_ref",
+                    "job_role",
                     "pay_option",
                     "agency_contact_name",
                     "agency_contact_email"
