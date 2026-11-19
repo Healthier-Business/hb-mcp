@@ -57,7 +57,8 @@ How a booking gets its `candidate_ref`: a booking made through this API (or the 
 | `hold_hash` | required, the hold of this client |
 | `candidate_ref` | required, uuid of one of the client's Hub candidates (`422` on `candidate_ref` otherwise, never 404). The name, email and phone come from the Hub candidate. A candidate with no name, email or phone gets `422` on `candidate_ref` |
 | `phone` | optional, used when the Hub candidate has none |
-| `job_role`, `nmc_number`, `nursing_band` | optional |
+| `job_role` | required, the candidate's job role (at most 255 characters); a booking without one is refused with `422 validation_failed` on `job_role` |
+| `nmc_number`, `nursing_band` | optional |
 | `pay_option` | required: `credits`, `balance`, `invoice` (or `inv`) |
 | `agency_contact_name`, `agency_contact_email` | required |
 | `agency_email` | optional (default: the account's notification email) |
