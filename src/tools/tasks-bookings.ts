@@ -95,7 +95,7 @@ export const bookSlotTool = writeTask({
     city: { type: 'string', description: 'Virtual BLS: candidate city.' },
     postcode: { type: 'string', description: 'Virtual BLS: candidate postcode.' },
     phone: { type: 'string', description: 'Interviews and appraisals: candidate phone (optional).' },
-    job_role: { type: 'string' },
+    job_role: { type: 'string', description: 'Interviews: required, the job role of the candidate. Appraisals: optional.' },
     nmc_number: { type: 'string' },
     nursing_band: { type: 'string', description: 'Interviews: optional.' },
     video_call_awareness: { type: 'boolean', description: 'Appraisals: the user confirmed the candidate knows the appraisal is a video call.' },
@@ -120,6 +120,8 @@ export const bookSlotTool = writeTask({
     const cd = cand.data ?? {};
     problems.push(...candidateProblems(cd, false));
     lines.push(`Booking a ${p.label} for ${cd.name ?? ref}${cd.email ? ` (${cd.email})` : ''}.`);
+
+    if (args.portal === 'clinical-interviews' && !args.job_role?.trim()) problems.push('job_role is needed: a clinical interview cannot be booked without the job role of the candidate.');
 
     const typeId = typeIdOf(args);
     const types = await run.get(p.typeList, { query: { per_page: 50 } });

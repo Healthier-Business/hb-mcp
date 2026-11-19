@@ -373,7 +373,7 @@ describe('hb_book_slot', () => {
 
   it('clinical interview: hold then book; appraisal needs explicit awareness and books without a hold', async () => {
     h = await startHarness(WRITE_ENV);
-    const ci = await h.call('hb_book_slot', { portal: 'clinical-interviews', candidate_ref: REF, interview_type_id: 3, date: '2026-10-12', time: '11:00', pay_option: 'credits', agency_contact_name: 'A', agency_contact_email: 'a@example.com', confirm: true });
+    const ci = await h.call('hb_book_slot', { portal: 'clinical-interviews', candidate_ref: REF, interview_type_id: 3, job_role: 'Registered Nurse', date: '2026-10-12', time: '11:00', pay_option: 'credits', agency_contact_name: 'A', agency_contact_email: 'a@example.com', confirm: true });
     expect(ci.isError).toBe(false);
     expect(writes(h).map((q) => q.opId)).toEqual(['clinical-interviews.timeslots.hold', 'clinical-interviews.bookings.create']);
     const ca = { portal: 'clinical-appraisals', candidate_ref: REF, appraisal_type_id: 2, pay_option: 'credits', agency_contact_name: 'A', agency_contact_email: 'a@example.com' };
